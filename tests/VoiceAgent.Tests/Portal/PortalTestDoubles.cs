@@ -41,7 +41,7 @@ public sealed class FakeCallsApi : ICallsApi
     }
 
     public Task<IReadOnlyList<DemoCustomer>> GetDemoCustomersAsync(CancellationToken ct = default) =>
-        Task.FromResult<IReadOnlyList<DemoCustomer>>([new("10234567", "Amelia Hughes", "+447700900101", new DateOnly(1985, 3, 14), "LS1 4AP", "lighthouse", ["CS1042"])]);
+        Task.FromResult<IReadOnlyList<DemoCustomer>>([new("10234567", "Amelia Hughes", "+447700900101", new DateOnly(1985, 3, 14), "LS1 4AP", "lighthouse", ["CV2041 – Purchase, Searches"])]);
 }
 
 public static class Calls

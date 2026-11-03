@@ -66,7 +66,7 @@ public static class TelephonyEndpoints
 
             // Caller ID is only a hint for the human agent; the caller must still pass security.
             if (await customers.FindByPhoneNumberAsync(callerNumber) is { } match)
-                await tracker.AddEventAsync(session, $"Caller ID matches account {match.MaskedAccountNumber} (not verified)");
+                await tracker.AddEventAsync(session, $"Caller ID matches account {match.MaskedClientNumber} (not verified)");
 
             var answer = new AnswerCallOptions(incomingCallContext, callbackUri)
             {

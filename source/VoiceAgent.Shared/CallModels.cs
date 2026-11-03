@@ -46,7 +46,7 @@ public sealed record CallSummary
     public string? CallCategory { get; init; }
 
     /// <summary>Masked account number of the customer the caller claims to be (e.g. ****1234).</summary>
-    public string? ClaimedAccount { get; init; }
+    public string? ClaimedClient { get; init; }
     public string? CaseReference { get; init; }
 
     /// <summary>Only populated once the caller has passed security.</summary>
@@ -75,13 +75,13 @@ public sealed record TakeCallResult(bool Success, string Message);
 
 /// <summary>Demo-only view of the sample customers so testers know which answers to give.</summary>
 public sealed record DemoCustomer(
-    string AccountNumber,
+    string ClientNumber,
     string Name,
     string PhoneNumber,
     DateOnly DateOfBirth,
     string Postcode,
     string MemorableWord,
-    IReadOnlyList<string> CaseReferences);
+    IReadOnlyList<string> Matters);
 
 public static class CallsHub
 {

@@ -31,8 +31,8 @@ public static class CallEndpoints
 
             var list = await customers.ListAsync(ct);
             return Results.Ok(list.Select(c => new DemoCustomer(
-                c.AccountNumber, c.FullName, c.PhoneNumber, c.DateOfBirth, c.Postcode, c.MemorableWord,
-                c.Cases.Select(x => x.Reference).ToList())));
+                c.ClientNumber, c.FullName, c.PhoneNumber, c.DateOfBirth, c.Postcode, c.MemorableWord,
+                c.Cases.Select(x => $"{x.Reference} – {x.MatterType}, {x.Stage}").ToList())));
         });
 
         return app;

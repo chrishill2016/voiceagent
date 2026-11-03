@@ -8,7 +8,7 @@ public static class CallFormatting
     public static string Label(this CallStage stage) => stage switch
     {
         CallStage.Connecting => "Connecting",
-        CallStage.IdentifyingCase => "Identifying case",
+        CallStage.IdentifyingCase => "Identifying matter",
         CallStage.Verifying => "Security check",
         CallStage.Verified => "Verified",
         CallStage.QueuedForAgent => "Waiting for agent",

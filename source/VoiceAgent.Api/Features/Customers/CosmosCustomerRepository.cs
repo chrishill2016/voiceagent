@@ -12,8 +12,8 @@ public sealed class CosmosCustomerRepository(CosmosClient client, IOptions<Cosmo
 {
     private readonly Container _container = client.GetContainer(options.Value.Database, options.Value.CustomersContainer);
 
-    public async Task<Customer?> FindByAccountNumberAsync(string accountNumber, CancellationToken ct = default) =>
-        await new InMemoryCustomerRepository(await ListAsync(ct)).FindByAccountNumberAsync(accountNumber, ct);
+    public async Task<Customer?> FindByClientNumberAsync(string clientNumber, CancellationToken ct = default) =>
+        await new InMemoryCustomerRepository(await ListAsync(ct)).FindByClientNumberAsync(clientNumber, ct);
 
     public async Task<Customer?> FindByCaseReferenceAsync(string caseReference, CancellationToken ct = default) =>
         await new InMemoryCustomerRepository(await ListAsync(ct)).FindByCaseReferenceAsync(caseReference, ct);

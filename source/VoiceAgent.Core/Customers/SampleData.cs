@@ -13,7 +13,10 @@ public static class SampleData
     {
         using var stream = typeof(SampleData).Assembly.GetManifestResourceStream("VoiceAgent.Core.Data.sample-customers.json")
             ?? throw new InvalidOperationException("Sample customer data is missing from the assembly.");
-        return JsonSerializer.Deserialize<List<Customer>>(stream, new JsonSerializerOptions(JsonSerializerDefaults.Web))
+        return JsonSerializer.Deserialize<List<Customer>>(stream, new JsonSerializerOptions(JsonSerializerDefaults.Web)
+            {
+                Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() },
+            })
             ?? [];
     }
 }

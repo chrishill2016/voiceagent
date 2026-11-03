@@ -5,10 +5,10 @@ public sealed class InMemoryCustomerRepository(IEnumerable<Customer> customers) 
 {
     private readonly IReadOnlyList<Customer> _customers = customers.ToList();
 
-    public Task<Customer?> FindByAccountNumberAsync(string accountNumber, CancellationToken ct = default)
+    public Task<Customer?> FindByClientNumberAsync(string clientNumber, CancellationToken ct = default)
     {
-        var wanted = Identifiers.NormaliseAccountNumber(accountNumber);
-        return Task.FromResult(_customers.FirstOrDefault(c => Identifiers.NormaliseAccountNumber(c.AccountNumber) == wanted));
+        var wanted = Identifiers.NormaliseClientNumber(clientNumber);
+        return Task.FromResult(_customers.FirstOrDefault(c => Identifiers.NormaliseClientNumber(c.ClientNumber) == wanted));
     }
 
     public Task<Customer?> FindByCaseReferenceAsync(string caseReference, CancellationToken ct = default)

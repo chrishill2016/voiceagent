@@ -35,8 +35,8 @@ else
                     <dt>Duration</dt><dd>@CallFormatting.Duration(_summary.StartedAt, _summary.EndedAt)</dd>
                     <dt>Reason</dt><dd>@(_summary.CallReason ?? "Not known yet")</dd>
                     <dt>Category</dt><dd>@(_summary.CallCategory ?? "–")</dd>
-                    <dt>Account</dt><dd>@(_summary.ClaimedAccount ?? "–")</dd>
-                    <dt>Case</dt><dd>@(_summary.CaseReference ?? "–")</dd>
+                    <dt>Client</dt><dd>@(_summary.ClaimedClient ?? "–")</dd>
+                    <dt>Matter</dt><dd>@(_summary.CaseReference ?? "–")</dd>
                     @if (_summary.QueueReason is not null)
                     {
                         <dt>Queued</dt><dd>@_summary.QueueReason</dd>

@@ -13,8 +13,8 @@
     <MudCardContent Class="pt-0">
         <dl class="facts">
             <dt>Reason</dt><dd>@(Call.CallReason ?? "Not known yet")</dd>
-            <dt>Account</dt><dd>@(Call.ClaimedAccount ?? "–")</dd>
-            <dt>Case</dt><dd>@(Call.CaseReference ?? "–")</dd>
+            <dt>Client</dt><dd>@(Call.ClaimedClient ?? "–")</dd>
+            <dt>Matter</dt><dd>@(Call.CaseReference ?? "–")</dd>
             <dt>Security</dt>
             <dd>
                 <MudText Typo="Typo.body2" Color="@Call.Verification.Colour()" Inline="true">@Call.Verification.Label()</MudText>

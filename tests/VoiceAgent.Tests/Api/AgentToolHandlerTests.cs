@@ -16,10 +16,10 @@ public class AgentToolHandlerTests
     {
         var session = await _h.StartCallAsync();
 
-        await Call(session, ToolNames.RecordCallReason, new { reason = "Slow broadband", category = "Technical fault" });
+        await Call(session, ToolNames.RecordCallReason, new { reason = "Wants a progress update on their purchase", category = "Progress update" });
 
-        Assert.Equal("Slow broadband", session.Summary.CallReason);
-        Assert.Equal("Technical fault", session.Summary.CallCategory);
+        Assert.Equal("Wants a progress update on their purchase", session.Summary.CallReason);
+        Assert.Equal("Progress update", session.Summary.CallCategory);
         Assert.Equal(CallStage.IdentifyingCase, session.Summary.Stage);
     }
 
@@ -28,14 +28,14 @@ public class AgentToolHandlerTests
     {
         var session = await _h.StartCallAsync();
 
-        var result = await Call(session, ToolNames.FindCustomer, new { case_reference = "C S one zero four two" });
+        var result = await Call(session, ToolNames.FindCustomer, new { case_reference = "C V two oh four one" });
 
         Assert.True(result["found"]!.GetValue<bool>());
         var json = result.ToJsonString();
         Assert.DoesNotContain("Amelia", json);
         Assert.DoesNotContain("lighthouse", json);
-        Assert.Equal("CS1042", session.Summary.CaseReference);
-        Assert.Equal("****4567", session.Summary.ClaimedAccount);
+        Assert.Equal("CV2041", session.Summary.CaseReference);
+        Assert.Equal("****4567", session.Summary.ClaimedClient);
         Assert.Equal(CallStage.Verifying, session.Summary.Stage);
         Assert.Null(session.Summary.CustomerName);
     }
@@ -44,7 +44,7 @@ public class AgentToolHandlerTests
     public async Task Unknown_account_is_reported_as_not_found()
     {
         var session = await _h.StartCallAsync();
-        var result = await Call(session, ToolNames.FindCustomer, new { account_number = "99999999" });
+        var result = await Call(session, ToolNames.FindCustomer, new { client_number = "99999999" });
         Assert.False(result["found"]!.GetValue<bool>());
     }
 
@@ -52,11 +52,11 @@ public class AgentToolHandlerTests
     public async Task Case_details_are_blocked_until_security_is_passed()
     {
         var session = await _h.StartCallAsync();
-        await Call(session, ToolNames.FindCustomer, new { account_number = "10234567" });
+        await Call(session, ToolNames.FindCustomer, new { client_number = "10234567" });
 
         var blocked = await Call(session, ToolNames.GetCaseDetails, new { });
         Assert.NotNull(blocked["error"]);
-        Assert.DoesNotContain("Broadband", blocked.ToJsonString());
+        Assert.DoesNotContain("Elm Road", blocked.ToJsonString());
 
         var verified = await Call(session, ToolNames.VerifyIdentity, new { date_of_birth = "14/03/1985", postcode = "LS14AP", memorable_word = "lighthouse" });
         Assert.True(verified["verified"]!.GetValue<bool>());
@@ -64,15 +64,17 @@ public class AgentToolHandlerTests
         Assert.Equal(CallStage.Verified, session.Summary.Stage);
 
         var details = await Call(session, ToolNames.GetCaseDetails, new { });
-        Assert.Contains("CS1042", details.ToJsonString());
-        Assert.Contains("Engineer visit booked", details.ToJsonString());
+        Assert.Contains("CV2041", details.ToJsonString());
+        Assert.Contains("Searches", details.ToJsonString());
+        Assert.Contains("Local authority", details.ToJsonString());
+        Assert.Contains("Friday 4 December 2026", details.ToJsonString());
     }
 
     [Fact]
     public async Task Three_failed_security_attempts_queue_the_caller_for_an_agent()
     {
         var session = await _h.StartCallAsync();
-        await Call(session, ToolNames.FindCustomer, new { account_number = "10234567" });
+        await Call(session, ToolNames.FindCustomer, new { client_number = "10234567" });
         var wrong = new { date_of_birth = "1 January 1990", postcode = "AB1 2CD", memorable_word = "nope" };
 
         var first = await Call(session, ToolNames.VerifyIdentity, wrong);
@@ -95,7 +97,7 @@ public class AgentToolHandlerTests
     public async Task Wrong_answers_never_say_which_answer_was_wrong()
     {
         var session = await _h.StartCallAsync();
-        await Call(session, ToolNames.FindCustomer, new { account_number = "10234567" });
+        await Call(session, ToolNames.FindCustomer, new { client_number = "10234567" });
 
         var result = await Call(session, ToolNames.VerifyIdentity, new { date_of_birth = "14/03/1985", postcode = "LS1 4AP", memorable_word = "wrong" });
 
@@ -117,10 +119,10 @@ public class AgentToolHandlerTests
     public async Task Switching_account_after_verifying_requires_security_again()
     {
         var session = await _h.StartCallAsync();
-        await Call(session, ToolNames.FindCustomer, new { account_number = "10234567" });
+        await Call(session, ToolNames.FindCustomer, new { client_number = "10234567" });
         await Call(session, ToolNames.VerifyIdentity, new { date_of_birth = "14/03/1985", postcode = "LS1 4AP", memorable_word = "lighthouse" });
 
-        await Call(session, ToolNames.FindCustomer, new { account_number = "10987654" });
+        await Call(session, ToolNames.FindCustomer, new { client_number = "10987654" });
 
         Assert.Null(session.VerifiedCustomer);
         Assert.Null(session.Summary.CustomerName);
@@ -144,5 +146,37 @@ public class AgentToolHandlerTests
         var session = await _h.StartCallAsync();
         Assert.Contains("error", await _h.Tools.HandleAsync(session, ToolNames.FindCustomer, "{not json"));
         Assert.Contains("error", await _h.Tools.HandleAsync(session, "delete_everything", "{}"));
+    }
+
+    [Fact]
+    public async Task Completed_matters_are_left_out_of_the_progress_update_unless_asked_for()
+    {
+        var session = await _h.StartCallAsync();
+        await Call(session, ToolNames.FindCustomer, new { client_number = "10987654" });
+        await Call(session, ToolNames.VerifyIdentity, new { date_of_birth = "2nd November 1972", postcode = "M4 2BS", memorable_word = "marmalade" });
+
+        var open = (await Call(session, ToolNames.GetCaseDetails, new { })).ToJsonString();
+        Assert.Contains("CV2077", open);
+        Assert.DoesNotContain("CV1532", open);
+
+        var asked = (await Call(session, ToolNames.GetCaseDetails, new { case_reference = "CV1532" })).ToJsonString();
+        Assert.Contains("Remortgage", asked);
+    }
+
+    [Fact]
+    public async Task Progress_update_includes_milestones_and_who_it_is_waiting_on()
+    {
+        var session = await _h.StartCallAsync();
+        await Call(session, ToolNames.FindCustomer, new { case_reference = "CV2118" });
+        await Call(session, ToolNames.VerifyIdentity, new { date_of_birth = "9 January 1968", postcode = "BT1 5GS", memorable_word = "harbour" });
+
+        var details = await Call(session, ToolNames.GetCaseDetails, new { });
+        var matter = details["matters"]!.AsArray().Single()!;
+
+        Assert.Equal("Exchanged", matter["stage"]!.GetValue<string>());
+        Assert.Equal("Niamh Byrne", matter["case_handler"]!.GetValue<string>());
+        Assert.Contains("You", matter["waiting_on"]!.GetValue<string>());
+        Assert.Equal("Friday 13 November 2026", matter["completion_date"]!.GetValue<string>());
+        Assert.Contains(matter["milestones"]!.AsArray(), m => m!["name"]!.GetValue<string>() == "Exchange of contracts" && m["status"]!.GetValue<string>() == "done");
     }
 }
