@@ -1,5 +1,5 @@
 using Microsoft.Extensions.Options;
-using VoiceAgent.Core.Customers;
+using VoiceAgent.Core.Cases;
 using VoiceAgent.Shared;
 
 namespace VoiceAgent.Api.Features.Calls;
@@ -28,14 +28,15 @@ public static class CallEndpoints
         api.MapPost("/calls/{id}/decline", async (string id, DeclineCallRequest request, AgentQueue queue) =>
             Results.Ok(await queue.DeclineAsync(id, request.AgentId)));
 
-        api.MapGet("/demo/customers", async (ICustomerRepository customers, IOptions<DemoOptions> demo, CancellationToken ct) =>
+        api.MapGet("/demo/cases", async (ICaseRepository cases, IOptions<DemoOptions> demo, CancellationToken ct) =>
         {
             if (!demo.Value.ShowSampleData) return Results.NotFound();
 
-            var list = await customers.ListAsync(ct);
-            return Results.Ok(list.Select(c => new DemoCustomer(
-                c.ClientNumber, c.FullName, c.PhoneNumber, c.DateOfBirth, c.Postcode, c.MemorableWord,
-                c.Cases.Select(x => $"{x.Reference} – {x.MatterType}, {x.Stage}").ToList())));
+            var list = await cases.ListAsync(ct);
+            return Results.Ok(list.OrderBy(c => c.CaseNumber).Select(c => new DemoCase(
+                c.CaseNumber, c.MatterType, c.Stage, c.PropertyAddress, c.PropertyPostcode, c.Postcode,
+                c.Parties.Select(p => new DemoParty(p.FullName, p.DateOfBirth, p.PhoneNumber)).ToList(),
+                c.PreviousLender)));
         });
 
         return app;

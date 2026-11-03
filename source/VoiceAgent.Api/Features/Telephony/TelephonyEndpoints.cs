@@ -2,7 +2,7 @@ using System.Text.Json.Nodes;
 using Azure.Communication.CallAutomation;
 using Microsoft.Extensions.Options;
 using VoiceAgent.Api.Features.Calls;
-using VoiceAgent.Core.Customers;
+using VoiceAgent.Core.Cases;
 using VoiceAgent.Shared;
 
 namespace VoiceAgent.Api.Features.Telephony;
@@ -21,7 +21,7 @@ public static class TelephonyEndpoints
         HttpContext context,
         IOptions<AcsOptions> options,
         CallTracker tracker,
-        ICustomerRepository customers,
+        ICaseRepository cases,
         IServiceProvider services,
         ILogger<CallTracker> logger)
     {
@@ -65,8 +65,8 @@ public static class TelephonyEndpoints
             session.CallerRawId = from?["rawId"]?.GetValue<string>();
 
             // Caller ID is only a hint for the human agent; the caller must still pass security.
-            if (await customers.FindByPhoneNumberAsync(callerNumber) is { } match)
-                await tracker.AddEventAsync(session, $"Caller ID matches account {match.MaskedClientNumber} (not verified)");
+            if (await cases.FindByPhoneNumberAsync(callerNumber) is { } match)
+                await tracker.AddEventAsync(session, $"Caller ID matches case {match.CaseNumber} (not verified)");
 
             var answer = new AnswerCallOptions(incomingCallContext, callbackUri)
             {

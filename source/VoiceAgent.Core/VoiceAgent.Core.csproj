@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="Data\sample-customers.json" LogicalName="VoiceAgent.Core.Data.sample-customers.json" />
+    <EmbeddedResource Include="Data\sample-cases.json" LogicalName="VoiceAgent.Core.Data.sample-cases.json" />
   </ItemGroup>
 
 </Project>

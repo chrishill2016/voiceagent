@@ -71,8 +71,9 @@ public sealed class FakeCallsApi : ICallsApi
         return Task.FromResult(new AgentResult(true, "ok", Agents.Make(id, "Agent", status)));
     }
 
-    public Task<IReadOnlyList<DemoCustomer>> GetDemoCustomersAsync(CancellationToken ct = default) =>
-        Task.FromResult<IReadOnlyList<DemoCustomer>>([new("10234567", "Amelia Hughes", "+447700900101", new DateOnly(1985, 3, 14), "LS1 4AP", "lighthouse", ["CV2041 – Purchase, Searches"])]);
+    public Task<IReadOnlyList<DemoCase>> GetDemoCasesAsync(CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<DemoCase>>([new("1042/2617", "Purchase", "Searches", "14 Elm Road, Leeds LS6 2QT", "LS6 2QT", "LS1 4AP",
+            [new DemoParty("Amelia Hughes", new DateOnly(1985, 3, 14), "+447700900101")], "Nationwide Building Society")]);
 }
 
 public static class Calls

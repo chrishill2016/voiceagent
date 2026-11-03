@@ -28,7 +28,7 @@ public sealed class CosmosOptions
     public string? Endpoint { get; set; }
     public string Database { get; set; } = "voiceagent";
     public string CallsContainer { get; set; } = "calls";
-    public string CustomersContainer { get; set; } = "customers";
+    public string CasesContainer { get; set; } = "cases";
     public string AgentsContainer { get; set; } = "agents";
 }
 
@@ -47,9 +47,9 @@ public sealed class DemoOptions
 {
     public const string Section = "Demo";
 
-    /// <summary>Upsert the fictional sample customers into the customer store at startup.</summary>
+    /// <summary>Upsert the fictional sample cases into the case store at startup.</summary>
     public bool SeedSampleData { get; set; } = true;
 
-    /// <summary>Show the sample customers (including their security answers) in the portal. Demo only.</summary>
+    /// <summary>Show the sample cases (including their security answers) in the portal. Demo only.</summary>
     public bool ShowSampleData { get; set; } = true;
 }

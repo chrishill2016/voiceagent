@@ -1,48 +1,52 @@
 @page "/sample-data"
 @inject ICallsApi Api
 
-<PageTitle>Sample clients</PageTitle>
+<PageTitle>Sample cases</PageTitle>
 
-<MudText Typo="Typo.h4" id="h1" Class="mb-2">Sample clients</MudText>
+<MudText Typo="Typo.h4" id="h1" Class="mb-2">Sample cases</MudText>
 <MudAlert Severity="Severity.Warning" Class="mb-4">
-    Fictional clients and conveyancing matters, including the answers to the security questions, so you can test calls.
+    Fictional clients and conveyancing cases, including the answers to the security questions, so you can test calls.
+    Find a case by <b>case number</b>, or by <b>postcode and surname</b>. Security is the full name of anyone on the account,
+    the previous lender, and the date of birth of anyone on the account.
     Turn this page off in production with <code>Demo__ShowSampleData=false</code>.
 </MudAlert>
 
-<MudTable Items="_customers" Loading="_loading" Dense="true" Elevation="1">
+<MudTable Items="_cases" Loading="_loading" Dense="true" Elevation="1" data-testid="sample-cases">
     <HeaderContent>
-        <MudTh>Name</MudTh>
-        <MudTh>Client number</MudTh>
-        <MudTh>Phone</MudTh>
-        <MudTh>Date of birth</MudTh>
-        <MudTh>Postcode</MudTh>
-        <MudTh>Memorable word</MudTh>
-        <MudTh>Matters</MudTh>
+        <MudTh>Case number</MudTh>
+        <MudTh>People on the account</MudTh>
+        <MudTh>Previous lender</MudTh>
+        <MudTh>Postcodes</MudTh>
+        <MudTh>Matter</MudTh>
     </HeaderContent>
     <RowTemplate>
-        <MudTd DataLabel="Name">@context.Name</MudTd>
-        <MudTd DataLabel="Client number">@context.ClientNumber</MudTd>
-        <MudTd DataLabel="Phone">@context.PhoneNumber</MudTd>
-        <MudTd DataLabel="Date of birth">@context.DateOfBirth.ToString("d MMMM yyyy")</MudTd>
-        <MudTd DataLabel="Postcode">@context.Postcode</MudTd>
-        <MudTd DataLabel="Memorable word">@context.MemorableWord</MudTd>
-        <MudTd DataLabel="Matters">
-            @foreach (var matter in context.Matters)
+        <MudTd DataLabel="Case number"><b>@context.CaseNumber</b></MudTd>
+        <MudTd DataLabel="People on the account">
+            @foreach (var party in context.Parties)
             {
-                <div>@matter</div>
+                <div>@party.FullName · born @party.DateOfBirth.ToString("d MMMM yyyy")</div>
             }
+        </MudTd>
+        <MudTd DataLabel="Previous lender">@(context.PreviousLender ?? "None (first-time buyer)")</MudTd>
+        <MudTd DataLabel="Postcodes">
+            <div>Property: @context.PropertyPostcode</div>
+            <div>Home: @context.Postcode</div>
+        </MudTd>
+        <MudTd DataLabel="Matter">
+            <div>@context.MatterType · @context.Stage</div>
+            <MudText Typo="Typo.caption" Class="mud-text-secondary">@context.PropertyAddress</MudText>
         </MudTd>
     </RowTemplate>
     <NoRecordsContent><MudText>Sample data is turned off.</MudText></NoRecordsContent>
 </MudTable>
 
 @code {
-    private IReadOnlyList<DemoCustomer> _customers = [];
+    private IReadOnlyList<DemoCase> _cases = [];
     private bool _loading = true;
 
     protected override async Task OnInitializedAsync()
     {
-        _customers = await Api.GetDemoCustomersAsync();
+        _cases = await Api.GetDemoCasesAsync();
         _loading = false;
     }
 }

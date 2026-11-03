@@ -45,13 +45,12 @@ public sealed record CallSummary
     public string? CallReason { get; init; }
     public string? CallCategory { get; init; }
 
-    /// <summary>Masked account number of the customer the caller claims to be (e.g. ****1234).</summary>
-    public string? ClaimedClient { get; init; }
+    /// <summary>Case number (1234/5678) the caller has been matched to. Not proof of identity until verified.</summary>
     public string? CaseReference { get; init; }
 
-    /// <summary>Only populated once the caller has passed security.</summary>
-    public string? CustomerName { get; init; }
-    public string? CustomerId { get; init; }
+    /// <summary>Names on the account. Only populated once the caller has passed security.</summary>
+    public string? ClientName { get; init; }
+    public string? CaseId { get; init; }
 
     public VerificationStatus Verification { get; init; } = VerificationStatus.NotStarted;
     public int VerificationAttempts { get; init; }
@@ -79,15 +78,18 @@ public sealed record TakeCallRequest(string AgentId);
 
 public sealed record TakeCallResult(bool Success, string Message);
 
-/// <summary>Demo-only view of the sample customers so testers know which answers to give.</summary>
-public sealed record DemoCustomer(
-    string ClientNumber,
-    string Name,
-    string PhoneNumber,
-    DateOnly DateOfBirth,
+/// <summary>Demo-only view of the sample cases so testers know which answers to give.</summary>
+public sealed record DemoCase(
+    string CaseNumber,
+    string MatterType,
+    string Stage,
+    string PropertyAddress,
+    string PropertyPostcode,
     string Postcode,
-    string MemorableWord,
-    IReadOnlyList<string> Matters);
+    IReadOnlyList<DemoParty> Parties,
+    string? PreviousLender);
+
+public sealed record DemoParty(string FullName, DateOnly DateOfBirth, string? PhoneNumber);
 
 public static class CallsHub
 {

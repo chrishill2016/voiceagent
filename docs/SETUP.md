@@ -75,7 +75,7 @@ Then, in the Foundry portal:
 az cosmosdb create -n $COSMOS -g $RG --locations regionName=$LOCATION --capabilities EnableServerless --disable-key-based-metadata-write-access true
 az cosmosdb sql database create -a $COSMOS -g $RG -n voiceagent
 az cosmosdb sql container create -a $COSMOS -g $RG -d voiceagent -n calls --partition-key-path /id
-az cosmosdb sql container create -a $COSMOS -g $RG -d voiceagent -n customers --partition-key-path /id
+az cosmosdb sql container create -a $COSMOS -g $RG -d voiceagent -n cases --partition-key-path /id
 az cosmosdb sql container create -a $COSMOS -g $RG -d voiceagent -n agents --partition-key-path /id
 COSMOS_ENDPOINT=$(az cosmosdb show -n $COSMOS -g $RG --query documentEndpoint -o tsv)
 ```
@@ -152,7 +152,7 @@ az containerapp update -n $APP -g $RG --set-env-vars \
 - Each member of the team sets their own transfer target in the portal (**Set up agent**): their phone number (`+44…`) or Teams user (`8:orgid:<user-object-id>`). Calls they accept are transferred there.
 - Optional: `Acs__HoldMusicUrl=https://…/hold.wav` (a public WAV file).
 
-Open `https://$APP_FQDN`, go to **Test call**, and talk to the agent. Use the **Sample clients** page for the security answers.
+Open `https://$APP_FQDN`, go to **Test call**, and talk to the agent. Use the **Sample cases** page for the security answers.
 
 ## 8. Route incoming phone calls to the app (Event Grid)
 
@@ -202,7 +202,7 @@ From then on, every merge to `main` builds, tests and deploys. The deploy job is
 | Queued callers are never offered to anyone | At least one agent must be set to **Available** in the portal. Agents who miss an offer are set to Offline. |
 | **Take call** says telephony isn't configured | Set `Acs__Endpoint` and `Acs__PublicBaseUrl`. Browser test calls can still be taken without them. |
 | A transfer rings but fails | Check the agent's transfer target on the **Agents** page. Calling out to a phone number needs an ACS number that can make outbound calls. |
-| The agent mishears matter references | Callers can say them letter by letter and digit by digit. The app normalises "C V two oh four one" to `CV2041`. |
+| The agent mishears case numbers | Callers can say them digit by digit, with or without "slash" or "stroke". The app normalises "one oh four two stroke two six one seven" to `1042/2617`. If it still can't find the case, the agent asks for the postcode and surname. |
 
 ## Local development against Azure
 

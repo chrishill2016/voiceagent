@@ -16,7 +16,7 @@ public interface ICallsApi
     Task<AgentResult> CreateAgentAsync(SaveAgentRequest request, CancellationToken ct = default);
     Task<AgentResult> UpdateAgentAsync(string id, SaveAgentRequest request, CancellationToken ct = default);
     Task<AgentResult> SetAgentStatusAsync(string id, AgentStatus status, CancellationToken ct = default);
-    Task<IReadOnlyList<DemoCustomer>> GetDemoCustomersAsync(CancellationToken ct = default);
+    Task<IReadOnlyList<DemoCase>> GetDemoCasesAsync(CancellationToken ct = default);
 }
 
 public sealed class CallsApi(HttpClient http) : ICallsApi
@@ -80,11 +80,11 @@ public sealed class CallsApi(HttpClient http) : ICallsApi
         }
     }
 
-    public async Task<IReadOnlyList<DemoCustomer>> GetDemoCustomersAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<DemoCase>> GetDemoCasesAsync(CancellationToken ct = default)
     {
-        var response = await http.GetAsync("api/demo/customers", ct);
+        var response = await http.GetAsync("api/demo/cases", ct);
         return response.IsSuccessStatusCode
-            ? await response.Content.ReadFromJsonAsync<List<DemoCustomer>>(Json, ct) ?? []
+            ? await response.Content.ReadFromJsonAsync<List<DemoCase>>(Json, ct) ?? []
             : [];
     }
 }

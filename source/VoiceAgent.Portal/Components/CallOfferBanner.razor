@@ -14,7 +14,7 @@
                     <MudText Typo="Typo.subtitle1"><b>Call for you</b> · @call.CallerNumber</MudText>
                     <MudText Typo="Typo.body2">
                         @(call.QueueReason ?? "Caller waiting")
-                        @if (call.CaseReference is not null) { <span> · Matter @call.CaseReference</span> }
+                        @if (call.CaseReference is not null) { <span> · Case @call.CaseReference</span> }
                         · Security: @call.Verification.Label()
                     </MudText>
                 </div>

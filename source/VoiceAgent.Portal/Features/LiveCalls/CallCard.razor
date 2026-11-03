@@ -13,8 +13,7 @@
     <MudCardContent Class="pt-0">
         <dl class="facts">
             <dt>Reason</dt><dd>@(Call.CallReason ?? "Not known yet")</dd>
-            <dt>Client</dt><dd>@(Call.ClaimedClient ?? "–")</dd>
-            <dt>Matter</dt><dd>@(Call.CaseReference ?? "–")</dd>
+            <dt>Case</dt><dd>@(Call.CaseReference ?? "–")</dd>
             <dt>Security</dt>
             <dd>
                 <MudText Typo="Typo.body2" Color="@Call.Verification.Colour()" Inline="true">@Call.Verification.Label()</MudText>
@@ -23,9 +22,9 @@
                     <MudText Typo="Typo.caption" Inline="true"> (@Call.VerificationAttempts failed)</MudText>
                 }
             </dd>
-            @if (Call.CustomerName is not null)
+            @if (Call.ClientName is not null)
             {
-                <dt>Customer</dt><dd>@Call.CustomerName</dd>
+                <dt>Client</dt><dd>@Call.ClientName</dd>
             }
             @if (Call.AssignedAgent is not null)
             {

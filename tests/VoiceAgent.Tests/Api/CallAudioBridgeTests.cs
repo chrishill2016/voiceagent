@@ -46,7 +46,7 @@ public class CallAudioBridgeTests
         var run = _h.Bridge(new VoiceLiveOptions { GreetOnConnect = false }).RunAsync(session, _caller, CancellationToken.None);
         await Eventually.TrueAsync(() => _h.VoiceLive.SentTypes.Contains("session.update"), "session configured");
 
-        _h.VoiceLive.Push(new VoiceLiveEvent.FunctionCall("call-1", ToolNames.FindCustomer, """{"client_number":"10234567"}"""));
+        _h.VoiceLive.Push(new VoiceLiveEvent.FunctionCall("call-1", ToolNames.FindCase, """{"case_number":"1042/2617"}"""));
         _h.VoiceLive.Push(new VoiceLiveEvent.ResponseDone());
 
         await Eventually.TrueAsync(() => _h.VoiceLive.SentTypes.Contains("response.create"), "agent asked to continue");

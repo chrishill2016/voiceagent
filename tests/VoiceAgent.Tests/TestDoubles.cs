@@ -10,7 +10,7 @@ using VoiceAgent.Api.Features.Media;
 using VoiceAgent.Api.Features.Telephony;
 using VoiceAgent.Api.Features.Tools;
 using VoiceAgent.Api.Features.VoiceLive;
-using VoiceAgent.Core.Customers;
+using VoiceAgent.Core.Cases;
 using VoiceAgent.Shared;
 
 namespace VoiceAgent.Tests;
@@ -120,7 +120,7 @@ public sealed class TestHarness
         Agents = new AgentDirectory(new InMemoryAgentStore(), Notifier, Time, NullLogger<AgentDirectory>.Instance);
         Queue = new AgentQueue(Tracker, Agents, CallControl, Time,
             Options.Create(new QueueOptions { OfferTimeoutSeconds = 20, DeclineCooldownSeconds = 60 }));
-        Tools = new AgentToolHandler(new InMemoryCustomerRepository(SampleData.LoadCustomers()), Tracker, Queue, NullLogger<AgentToolHandler>.Instance);
+        Tools = new AgentToolHandler(new InMemoryCaseRepository(SampleData.LoadCases()), Tracker, Queue, NullLogger<AgentToolHandler>.Instance);
     }
 
     public CallAudioBridge Bridge(VoiceLiveOptions? options = null) => new(
@@ -141,7 +141,8 @@ public sealed class TestHarness
         return Agents.Get(created.Agent.Id)!;
     }
 
-    public static Customer Amelia => SampleData.LoadCustomers().Single(c => c.Id == "cust-001");
+    /// <summary>Amelia and Tom Hughes's purchase, case 1042/2617.</summary>
+    public static ConveyancingCase HughesPurchase => SampleData.LoadCases().Single(c => c.CaseNumber == "1042/2617");
 }
 
 public static class Eventually

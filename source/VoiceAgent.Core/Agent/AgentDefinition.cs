@@ -17,7 +17,7 @@ public sealed record AgentTool(string Name, string Description, JsonObject Param
 public static class ToolNames
 {
     public const string RecordCallReason = "record_call_reason";
-    public const string FindCustomer = "find_customer";
+    public const string FindCase = "find_case";
     public const string VerifyIdentity = "verify_identity";
     public const string GetCaseDetails = "get_case_details";
     public const string TransferToAgent = "transfer_to_agent";
@@ -51,13 +51,15 @@ public static class AgentDefinition
         # Call flow
         1. Greet the caller: "Thanks for calling Contoso Conveyancing, you're speaking with Ava, an automated assistant. This call is transcribed for quality and training. How can I help today?"
         2. Understand why they are calling. Once you understand, call record_call_reason with a one-sentence summary and the best category.
-        3. Identify the matter: ask for their matter reference, which is "CV" followed by four digits and is on all our letters and emails.
-           If they don't have it, ask for their client number instead. Call find_customer.
+        3. Find the case: ask for their case number. It's eight digits written with a slash, like 1234/5678, and is on all our letters and emails.
+           If they don't have it, ask for the postcode (of the property or their home address) and their surname instead.
+           Call find_case. Pass the case number as digits in the format 1234/5678.
            - If nothing is found, ask them to check and repeat it once. If it is still not found, offer to transfer them to a colleague.
+           - If more than one case matches, ask for the case number.
         4. Security: tell the caller you need to ask a few security questions. Ask, one at a time, for:
-           a. their date of birth,
-           b. the postcode of their current home address,
-           c. their memorable word.
+           a. the full name of anyone on the account,
+           b. the name of their previous mortgage lender (if they say they've never had a mortgage, pass "none"),
+           c. the date of birth of anyone on the account.
            Then call verify_identity with all three answers exactly as the caller said them.
            - Never repeat the answers back, and never say which answer was wrong.
            - If the result says a retry is allowed, say you couldn't verify those details and ask all three questions again.
@@ -72,7 +74,7 @@ public static class AgentDefinition
            call transfer_to_agent with a short reason, then tell them you're transferring them to a colleague and to stay on the line.
 
         # Rules
-        - Never share any matter details before verify_identity has succeeded.
+        - Never share any case details, including names on the account, before verify_identity has succeeded.
         - Never give legal or financial advice, and never predict dates beyond the target dates you were given. Offer a transfer instead.
         - Never guess or invent information. If you don't know, offer a transfer.
         - Payment fraud: never give out, confirm or change bank details. If the caller asks about sending money or says they've had
@@ -92,26 +94,25 @@ public static class AgentDefinition
                 ("reason", StringProp("One-sentence summary of why the client is calling.")),
                 ("category", EnumProp("Best matching category for the call.", CallCategories)))),
 
-        new(ToolNames.FindCustomer,
-            "Look up the client using their matter reference (preferred) or client number. Returns whether a match was found; it does not return personal details.",
+        new(ToolNames.FindCase,
+            "Find the caller's case by case number (preferred), or by postcode and surname. Returns whether a single case was found; it does not return any personal details.",
             Schema(
                 required: [],
-                ("client_number", StringProp("The client number exactly as the caller said it.")),
-                ("case_reference", StringProp("The matter reference exactly as the caller said it, e.g. CV2041.")))),
+                ("case_number", StringProp("The case number, as digits in the format 1234/5678.")),
+                ("postcode", StringProp("Postcode of the property or the client's home address, if no case number.")),
+                ("surname", StringProp("Surname of someone on the account, if no case number.")))),
 
         new(ToolNames.VerifyIdentity,
-            "Check the caller's security answers against the client found by find_customer. Returns whether they passed and what to do next.",
+            "Check the caller's security answers against the case found by find_case. Returns whether they passed and what to do next.",
             Schema(
-                required: ["date_of_birth", "postcode", "memorable_word"],
-                ("date_of_birth", StringProp("Date of birth exactly as the caller said it.")),
-                ("postcode", StringProp("Postcode exactly as the caller said it.")),
-                ("memorable_word", StringProp("Memorable word exactly as the caller said it.")))),
+                required: ["full_name", "previous_lender", "date_of_birth"],
+                ("full_name", StringProp("Full name of anyone on the account, exactly as the caller said it.")),
+                ("previous_lender", StringProp("The caller's previous mortgage lender, exactly as they said it, or \"none\".")),
+                ("date_of_birth", StringProp("Date of birth of anyone on the account, exactly as the caller said it.")))),
 
         new(ToolNames.GetCaseDetails,
-            "Get the verified client's matter details: stage, latest update, what it's waiting on, next step, target dates and milestones. Only works after verify_identity has succeeded.",
-            Schema(
-                required: [],
-                ("case_reference", StringProp("Optional matter reference. If omitted, all open matters are returned.")))),
+            "Get the verified case's progress: stage, latest update, what it's waiting on, next step, target dates and milestones. Only works after verify_identity has succeeded.",
+            Schema(required: [])),
 
         new(ToolNames.TransferToAgent,
             "Put the caller in the queue for a member of the client services team.",

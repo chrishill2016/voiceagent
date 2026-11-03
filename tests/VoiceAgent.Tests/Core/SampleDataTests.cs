@@ -1,20 +1,31 @@
-using VoiceAgent.Core.Customers;
+using VoiceAgent.Core.Cases;
 
 namespace VoiceAgent.Tests.Core;
 
 public class SampleDataTests
 {
     [Fact]
-    public void Every_sample_client_has_conveyancing_matters_with_unique_references()
+    public void Sample_cases_use_the_firms_case_number_format_and_are_complete()
     {
-        var clients = SampleData.LoadCustomers();
-        var matters = clients.SelectMany(c => c.Cases).ToList();
+        var cases = SampleData.LoadCases();
 
-        Assert.True(clients.Count >= 5);
-        Assert.All(clients, c => Assert.NotEmpty(c.Cases));
-        Assert.Equal(matters.Count, matters.Select(m => m.Reference).Distinct().Count());
-        Assert.All(matters, m => Assert.Matches("^CV[0-9]{4}$", m.Reference));
-        Assert.All(matters, m => Assert.NotEmpty(m.Milestones));
-        Assert.All(matters.Where(m => !m.IsCompleted), m => Assert.False(string.IsNullOrWhiteSpace(m.NextStep)));
+        Assert.True(cases.Count >= 5);
+        Assert.Equal(cases.Count, cases.Select(c => c.CaseNumber).Distinct().Count());
+        Assert.All(cases, c => Assert.Matches("^[0-9]{4}/[0-9]{4}$", c.CaseNumber));
+        Assert.All(cases, c => Assert.NotEmpty(c.Parties));
+        Assert.All(cases, c => Assert.NotEmpty(c.Milestones));
+        Assert.All(cases.Where(c => !c.IsCompleted), c => Assert.False(string.IsNullOrWhiteSpace(c.NextStep)));
+        Assert.Contains(cases, c => c.Parties.Count > 1);
+        Assert.Contains(cases, c => c.PreviousLender is null);
+    }
+
+    [Fact]
+    public void Dates_fall_on_working_days()
+    {
+        var dates = SampleData.LoadCases().SelectMany(c => new[] { c.OpenedOn, c.LastUpdatedOn, c.TargetExchangeDate, c.CompletionDate }
+            .Concat(c.Milestones.Select(m => m.CompletedOn)))
+            .OfType<DateOnly>();
+
+        Assert.All(dates, d => Assert.DoesNotContain(d.DayOfWeek, new[] { DayOfWeek.Saturday, DayOfWeek.Sunday }));
     }
 }
