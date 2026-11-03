@@ -2,7 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using VoiceAgent.Api.Features.Calls;
 using VoiceAgent.Core.Agent;
-using VoiceAgent.Core.Customers;
+using VoiceAgent.Core.Cases;
 using VoiceAgent.Core.Verification;
 using VoiceAgent.Shared;
 
@@ -13,7 +13,7 @@ namespace VoiceAgent.Api.Features.Tools;
 /// the model only ever sees pass/fail and case details for callers who have passed security.
 /// </summary>
 public sealed class AgentToolHandler(
-    ICustomerRepository customers,
+    ICaseRepository cases,
     CallTracker tracker,
     AgentQueue queue,
     ILogger<AgentToolHandler> logger)
@@ -35,9 +35,9 @@ public sealed class AgentToolHandler(
             return toolName switch
             {
                 ToolNames.RecordCallReason => await RecordCallReasonAsync(session, args),
-                ToolNames.FindCustomer => await FindCustomerAsync(session, args, ct),
+                ToolNames.FindCase => await FindCaseAsync(session, args, ct),
                 ToolNames.VerifyIdentity => await VerifyIdentityAsync(session, args),
-                ToolNames.GetCaseDetails => await GetCaseDetailsAsync(session, args),
+                ToolNames.GetCaseDetails => await GetCaseDetailsAsync(session),
                 ToolNames.TransferToAgent => await TransferAsync(session, args),
                 _ => Output(new { error = $"Unknown tool '{toolName}'." }),
             };
@@ -62,54 +62,63 @@ public sealed class AgentToolHandler(
         });
         await tracker.AddEventAsync(session, $"Reason for call: {reason} ({category})");
 
-        return Output(new { recorded = true, next_step = "Ask for the matter reference or client number." });
+        return Output(new { recorded = true, next_step = "Ask for the case number, or the postcode and surname." });
     }
 
-    private async Task<string> FindCustomerAsync(CallSession session, JsonObject args, CancellationToken ct)
+    private async Task<string> FindCaseAsync(CallSession session, JsonObject args, CancellationToken ct)
     {
-        var clientNumber = Str(args, "client_number");
-        var caseReference = Str(args, "case_reference");
+        var caseNumber = Str(args, "case_number");
+        var postcode = Str(args, "postcode");
+        var surname = Str(args, "surname");
 
-        Customer? customer = null;
-        string? matchedCase = null;
+        ConveyancingCase? match = null;
+        var multiple = false;
 
-        if (!string.IsNullOrWhiteSpace(caseReference))
+        if (caseNumber is not null)
+            match = await cases.FindByCaseNumberAsync(caseNumber, ct);
+
+        if (match is null && postcode is not null && surname is not null)
         {
-            customer = await customers.FindByCaseReferenceAsync(caseReference, ct);
-            if (customer is not null)
-            {
-                var wanted = Identifiers.NormaliseCaseReference(caseReference);
-                matchedCase = customer.Cases.First(c => Identifiers.NormaliseCaseReference(c.Reference) == wanted).Reference;
-            }
+            var found = await cases.FindByPostcodeAndSurnameAsync(postcode, surname, ct);
+            // Prefer the one open case if the others are completed.
+            var candidates = found.Count > 1 ? found.Where(c => !c.IsCompleted).ToList() : found.ToList();
+            if (candidates.Count == 1) match = candidates[0];
+            else multiple = found.Count > 1;
         }
 
-        if (customer is null && !string.IsNullOrWhiteSpace(clientNumber))
-            customer = await customers.FindByClientNumberAsync(clientNumber, ct);
-
-        if (customer is null)
+        if (match is null)
         {
-            await tracker.AddEventAsync(session, $"No client found for {Describe(clientNumber, caseReference)}");
+            await tracker.AddEventAsync(session, multiple
+                ? $"Several cases match postcode '{postcode}' and surname '{surname}'"
+                : $"No case found for {Describe(caseNumber, postcode, surname)}");
+
             return Output(new
             {
                 found = false,
-                next_step = "Ask the caller to check and repeat the number once. If it still isn't found, offer to transfer them to a colleague.",
+                multiple_matches = multiple,
+                next_step = multiple
+                    ? "More than one case matches. Ask the caller for their case number."
+                    : caseNumber is not null && (postcode is null || surname is null)
+                        ? "Ask the caller to check the case number and repeat it once. If they can't find it, ask for the postcode and surname instead."
+                        : "Ask the caller to check and repeat the details once. If it still isn't found, offer to transfer them to a colleague.",
             });
         }
 
-        session.SetClaimedCustomer(customer);
-        var verified = session.VerifiedCustomer?.Id == customer.Id;
+        session.SetClaimedCase(match);
+        var verified = session.VerifiedCase?.Id == match.Id;
 
         await tracker.UpdateAsync(session, s => s with
         {
-            ClaimedClient = customer.MaskedClientNumber,
-            CaseReference = matchedCase ?? s.CaseReference,
+            CaseReference = match.CaseNumber,
             Stage = verified ? CallStage.Verified : CallStage.Verifying,
             Verification = verified ? VerificationStatus.Passed : VerificationStatus.InProgress,
-            CustomerName = verified ? s.CustomerName : null,
-            CustomerId = verified ? s.CustomerId : null,
+            ClientName = verified ? s.ClientName : null,
+            CaseId = verified ? s.CaseId : null,
             VerificationAttempts = session.FailedVerificationAttempts,
         });
-        await tracker.AddEventAsync(session, $"Client {customer.MaskedClientNumber} found{(matchedCase is null ? "" : $" from matter {matchedCase}")}; security check required");
+        await tracker.AddEventAsync(session, caseNumber is not null && Identifiers.NormaliseCaseNumber(caseNumber) == Identifiers.NormaliseCaseNumber(match.CaseNumber)
+            ? $"Case {match.CaseNumber} found by case number; security check required"
+            : $"Case {match.CaseNumber} found by postcode and surname; security check required");
 
         return Output(new
         {
@@ -117,21 +126,21 @@ public sealed class AgentToolHandler(
             already_verified = verified,
             next_step = verified
                 ? "The caller is already verified. Call get_case_details."
-                : "Ask the security questions one at a time: date of birth, postcode, memorable word. Then call verify_identity.",
+                : "Ask the security questions one at a time: the full name of anyone on the account, their previous mortgage lender, and the date of birth of anyone on the account. Then call verify_identity.",
         });
     }
 
     private async Task<string> VerifyIdentityAsync(CallSession session, JsonObject args)
     {
-        var customer = session.ClaimedCustomer;
-        if (customer is null)
-            return Output(new { verified = false, error = "No client has been found yet. Call find_customer first." });
+        var account = session.ClaimedCase;
+        if (account is null)
+            return Output(new { verified = false, error = "No case has been found yet. Call find_case first." });
 
         if (session.Summary.Stage == CallStage.QueuedForAgent)
             return Output(new { verified = false, transferring_to_agent = true, next_step = "The caller is already waiting for a colleague." });
 
-        var answers = new SecurityAnswers(Str(args, "date_of_birth"), Str(args, "postcode"), Str(args, "memorable_word"));
-        var result = IdentityVerifier.Evaluate(customer, answers, session.FailedVerificationAttempts);
+        var answers = new SecurityAnswers(Str(args, "full_name"), Str(args, "previous_lender"), Str(args, "date_of_birth"));
+        var result = IdentityVerifier.Evaluate(account, answers, session.FailedVerificationAttempts);
 
         switch (result.Decision)
         {
@@ -141,10 +150,10 @@ public sealed class AgentToolHandler(
                 {
                     Stage = CallStage.Verified,
                     Verification = VerificationStatus.Passed,
-                    CustomerName = customer.FullName,
-                    CustomerId = customer.Id,
+                    ClientName = account.ClientNames,
+                    CaseId = account.Id,
                 });
-                await tracker.AddEventAsync(session, $"Security passed for {customer.FullName}");
+                await tracker.AddEventAsync(session, $"Security passed for case {account.CaseNumber} ({account.ClientNames})");
                 return Output(new { verified = true, next_step = "Thank the caller and call get_case_details." });
 
             case VerificationDecision.RetryAllowed:
@@ -176,57 +185,40 @@ public sealed class AgentToolHandler(
         }
     }
 
-    private async Task<string> GetCaseDetailsAsync(CallSession session, JsonObject args)
+    private async Task<string> GetCaseDetailsAsync(CallSession session)
     {
-        var customer = session.VerifiedCustomer;
-        if (customer is null)
+        var c = session.VerifiedCase;
+        if (c is null)
             return Output(new { error = "The caller has not passed security. Do not share any details." });
 
-        var reference = Str(args, "case_reference");
-        var cases = customer.Cases
-            .Where(c => reference is null
-                || Identifiers.NormaliseCaseReference(c.Reference) == Identifiers.NormaliseCaseReference(reference))
-            .Where(c => reference is not null || !c.IsCompleted)
-            .ToList();
-
-        if (cases.Count == 1)
-            await tracker.UpdateAsync(session, s => s with { CaseReference = cases[0].Reference });
-
-        await tracker.AddEventAsync(session, cases.Count == 0
-            ? "No open matters found"
-            : $"Shared progress update: {string.Join(", ", cases.Select(c => $"{c.Reference} ({c.Stage})"))}");
+        await tracker.AddEventAsync(session, $"Shared progress update: {c.CaseNumber} ({c.Stage})");
 
         return Output(new
         {
-            client_first_name = customer.FirstName,
-            matters = cases.Select(c => new
+            client_names = c.ClientNames,
+            case_number = c.CaseNumber,
+            matter_type = c.MatterType,
+            property = c.PropertyAddress,
+            stage = c.Stage,
+            case_handler = c.CaseHandler,
+            latest_update = c.LatestUpdate,
+            waiting_on = c.WaitingOn,
+            next_step = c.NextStep,
+            target_exchange_date = SpokenDate(c.TargetExchangeDate),
+            completion_date = SpokenDate(c.CompletionDate),
+            last_updated = SpokenDate(c.LastUpdatedOn),
+            milestones = c.Milestones.Select(m => new
             {
-                reference = c.Reference,
-                matter_type = c.MatterType,
-                property = c.PropertyAddress,
-                stage = c.Stage,
-                case_handler = c.CaseHandler,
-                latest_update = c.LatestUpdate,
-                waiting_on = c.WaitingOn,
-                next_step = c.NextStep,
-                target_exchange_date = SpokenDate(c.TargetExchangeDate),
-                completion_date = SpokenDate(c.CompletionDate),
-                last_updated = SpokenDate(c.LastUpdatedOn),
-                milestones = c.Milestones.Select(m => new
+                name = m.Name,
+                status = m.Status switch
                 {
-                    name = m.Name,
-                    status = m.Status switch
-                    {
-                        MilestoneStatus.Done => "done",
-                        MilestoneStatus.InProgress => "in progress",
-                        _ => "not started",
-                    },
-                    completed_on = SpokenDate(m.CompletedOn),
-                }),
+                    MilestoneStatus.Done => "done",
+                    MilestoneStatus.InProgress => "in progress",
+                    _ => "not started",
+                },
+                completed_on = SpokenDate(m.CompletedOn),
             }),
-            note = cases.Count == 0
-                ? "There are no open matters. Ask how else you can help, or offer a transfer."
-                : null,
+            note = c.IsCompleted ? "This case has completed. Ask how else you can help, or offer a transfer." : null,
         });
     }
 
@@ -246,8 +238,10 @@ public sealed class AgentToolHandler(
     private static string? Str(JsonObject args, string name) =>
         args[name] is JsonValue v && v.TryGetValue<string>(out var s) && !string.IsNullOrWhiteSpace(s) ? s.Trim() : null;
 
-    private static string Describe(string? clientNumber, string? caseRef) =>
-        caseRef is not null ? $"matter reference '{caseRef}'" : clientNumber is not null ? $"client number '{clientNumber}'" : "no number given";
+    private static string Describe(string? caseNumber, string? postcode, string? surname) =>
+        caseNumber is not null ? $"case number '{caseNumber}'"
+        : postcode is not null || surname is not null ? $"postcode '{postcode}' and surname '{surname}'"
+        : "no details given";
 
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
     {

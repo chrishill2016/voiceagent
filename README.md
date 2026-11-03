@@ -14,7 +14,7 @@ Caller ──PSTN──► Azure Communication Services ──IncomingCall──
                          │  answers + bidirectional media streaming (24 kHz PCM)
                          ▼
                 /ws/media/{callId}  ◄──────── VoiceAgent.Api (Azure Container Apps) ────────►  Voice Live
-                                                 │  tool calls (find_customer, verify_identity, …)     │ (Foundry agent:
+                                                 │  tool calls (find_case, verify_identity, …)         │ (Foundry agent:
                                                  │  transcripts + call state                           │  customer-service-voice-agent)
                                                  ▼
                                    Cosmos DB (calls, clients, agents)    SignalR ──► Agent portal (Blazor WASM)
@@ -36,8 +36,8 @@ Caller ──PSTN──► Azure Communication Services ──IncomingCall──
 | Tool | What it does |
 | --- | --- |
 | `record_call_reason` | Saves a summary and category of why the customer is calling. |
-| `find_customer` | Looks up the client by matter reference (e.g. `CV2041`) or client number. Returns only *found / not found*. |
-| `verify_identity` | Checks date of birth, postcode and memorable word on the server. After 3 failures the caller is queued for an agent. |
+| `find_case` | Finds the case by **case number** (format `1234/5678`), or by **postcode** (property or home) and **surname** of anyone on the account. Returns only *found / not found*. If several cases match, the agent asks for the case number. |
+| `verify_identity` | Checks the **full name of anyone on the account**, the **previous lender**, and the **date of birth of anyone on the account**, on the server. After 3 failures the caller is queued for an agent. |
 | `get_case_details` | Returns the matter's stage, latest update, what it's waiting on, next step, target dates and milestones, but only once the caller has passed security. |
 | `transfer_to_agent` | Puts the caller in the agent queue. |
 
@@ -68,7 +68,7 @@ export VoiceLive__ProjectName=<project>
 dotnet run --project source/VoiceAgent.Api
 ```
 
-The **Sample clients** page lists the fictional clients, their matters and their security answers. For example: Amelia Hughes, client number `10234567`, matter `CV2041` (purchase, at searches), born 14 March 1985, postcode `LS1 4AP`, memorable word `lighthouse`.
+The **Sample cases** page lists the fictional cases and their security answers. For example, case `1042/2617` is Amelia and Tom Hughes's purchase, at the searches stage. Find it by case number, or by postcode `LS6 2QT` and surname Hughes. For security, the answers are "Amelia Hughes", previous lender "Nationwide", and date of birth 14 March 1985.
 
 Run the tests:
 

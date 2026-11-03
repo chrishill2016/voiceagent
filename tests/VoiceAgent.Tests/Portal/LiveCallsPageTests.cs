@@ -18,7 +18,7 @@ public class LiveCallsPageTests : PortalTestBase
     [Fact]
     public void Splits_queued_callers_from_calls_with_the_voice_agent()
     {
-        Live.Calls.Add(Calls.Make("call-01", CallStage.Verifying) with { CallReason = "Progress update on sale", ClaimedClient = "****4567" });
+        Live.Calls.Add(Calls.Make("call-01", CallStage.Verifying) with { CallReason = "Progress update on sale", CaseReference = "1077/3150" });
         Live.Calls.Add(Calls.Make("call-02", CallStage.QueuedForAgent) with { QueueReason = "Could not pass security questions", Verification = VerificationStatus.Failed });
 
         var page = Render<LiveCallsPage>();
@@ -29,7 +29,7 @@ public class LiveCallsPageTests : PortalTestBase
 
         var card = Assert.Single(page.FindAll("[data-testid=call-card]"));
         Assert.Contains("Progress update on sale", card.TextContent);
-        Assert.Contains("****4567", card.TextContent);
+        Assert.Contains("1077/3150", card.TextContent);
         Assert.Contains("Security check", card.TextContent);
     }
 

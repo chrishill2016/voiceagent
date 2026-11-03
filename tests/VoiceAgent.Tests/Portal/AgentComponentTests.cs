@@ -46,11 +46,11 @@ public class AgentComponentTests : PortalTestBase
         var banner = Render<CallOfferBanner>();
         Assert.Empty(banner.FindAll("[data-testid=call-offer]"));
 
-        Live.Calls[0] = Live.Calls[0] with { OfferedToAgentId = "a1", OfferExpiresAt = DateTimeOffset.UtcNow.AddSeconds(15), CaseReference = "CV2041" };
+        Live.Calls[0] = Live.Calls[0] with { OfferedToAgentId = "a1", OfferExpiresAt = DateTimeOffset.UtcNow.AddSeconds(15), CaseReference = "1042/2617" };
         Live.RaiseChanged();
 
         banner.WaitForAssertion(() => Assert.Contains("Wants their case handler", banner.Find("[data-testid=call-offer]").TextContent));
-        Assert.Contains("CV2041", banner.Markup);
+        Assert.Contains("1042/2617", banner.Markup);
 
         banner.Find("[data-testid=accept-offer]").Click();
 

@@ -1,9 +1,10 @@
+using System.Globalization;
 using System.Text;
 
-namespace VoiceAgent.Core.Customers;
+namespace VoiceAgent.Core.Cases;
 
 /// <summary>
-/// Normalises identifiers the way they arrive from speech-to-text, e.g. "one two three four" or "CS-1042".
+/// Normalises identifiers the way they arrive from speech-to-text, e.g. "one two three four stroke five six seven eight".
 /// </summary>
 public static class Identifiers
 {
@@ -20,7 +21,7 @@ public static class Identifiers
         if (string.IsNullOrWhiteSpace(value)) return string.Empty;
 
         var sb = new StringBuilder();
-        foreach (var token in value.Split([' ', '-', ',', '.', '/'], StringSplitOptions.RemoveEmptyEntries))
+        foreach (var token in value.Split([' ', '-', ',', '.', '/', '\\'], StringSplitOptions.RemoveEmptyEntries))
         {
             if (SpokenDigits.TryGetValue(token, out var digit))
             {
@@ -35,11 +36,30 @@ public static class Identifiers
         return sb.ToString();
     }
 
-    public static string NormaliseClientNumber(string? value) => new(AlphaNumeric(value).Where(char.IsDigit).ToArray());
+    /// <summary>The digits of a case number, so "1234/5678", "1234 5678" and "one two three four stroke …" all match.</summary>
+    public static string NormaliseCaseNumber(string? value) => new(AlphaNumeric(value).Where(char.IsDigit).ToArray());
 
-    public static string NormaliseCaseReference(string? value) => AlphaNumeric(value);
+    /// <summary>Formats 8 digits as the firm's case number format, 1234/5678.</summary>
+    public static string FormatCaseNumber(string? value)
+    {
+        var digits = NormaliseCaseNumber(value);
+        return digits.Length == 8 ? $"{digits[..4]}/{digits[4..]}" : (value ?? string.Empty).Trim();
+    }
 
     public static string NormalisePostcode(string? value) => AlphaNumeric(value);
+
+    /// <summary>Lower-case letters only, without accents: "O'Connor" → "oconnor", "Zoë" → "zoe".</summary>
+    public static string NormaliseName(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return string.Empty;
+
+        var decomposed = value.Normalize(NormalizationForm.FormD);
+        return new string(decomposed
+            .Where(c => CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)
+            .Where(char.IsLetter)
+            .Select(char.ToLowerInvariant)
+            .ToArray());
+    }
 
     public static string NormalisePhoneNumber(string? value)
     {

@@ -1,11 +1,11 @@
-using VoiceAgent.Core.Customers;
+using VoiceAgent.Core.Cases;
 using VoiceAgent.Shared;
 
 namespace VoiceAgent.Api.Features.Calls;
 
 /// <summary>
 /// Live, server-side state of a single call. Holds data the portal and the voice model must not see
-/// (e.g. the unverified customer record) alongside the public <see cref="CallSummary"/>.
+/// (e.g. the unverified case record) alongside the public <see cref="CallSummary"/>.
 /// </summary>
 public sealed class CallSession(CallSummary summary)
 {
@@ -24,11 +24,11 @@ public sealed class CallSession(CallSummary summary)
     /// <summary>Raw ACS identifier of the caller, needed for hold / transfer.</summary>
     public string? CallerRawId { get; set; }
 
-    /// <summary>Customer the caller claims to be (found by account number / case reference). Not yet verified.</summary>
-    public Customer? ClaimedCustomer { get; private set; }
+    /// <summary>The case the caller has been matched to (by case number, or postcode and surname). Not yet verified.</summary>
+    public ConveyancingCase? ClaimedCase { get; private set; }
 
-    /// <summary>Set only once the caller has passed security for <see cref="ClaimedCustomer"/>.</summary>
-    public Customer? VerifiedCustomer { get; private set; }
+    /// <summary>Set only once the caller has passed security for <see cref="ClaimedCase"/>.</summary>
+    public ConveyancingCase? VerifiedCase { get; private set; }
 
     public int FailedVerificationAttempts { get; private set; }
 
@@ -63,24 +63,24 @@ public sealed class CallSession(CallSummary summary)
         lock (_gate) _events.Add(evt);
     }
 
-    public void SetClaimedCustomer(Customer customer)
+    public void SetClaimedCase(ConveyancingCase account)
     {
         lock (_gate)
         {
-            if (ClaimedCustomer?.Id != customer.Id)
+            if (ClaimedCase?.Id != account.Id)
             {
-                // A different account means security starts again.
-                VerifiedCustomer = null;
+                // A different case means security starts again.
+                VerifiedCase = null;
                 FailedVerificationAttempts = 0;
             }
 
-            ClaimedCustomer = customer;
+            ClaimedCase = account;
         }
     }
 
     public void MarkVerified()
     {
-        lock (_gate) VerifiedCustomer = ClaimedCustomer;
+        lock (_gate) VerifiedCase = ClaimedCase;
     }
 
     public void RecordFailedVerification()

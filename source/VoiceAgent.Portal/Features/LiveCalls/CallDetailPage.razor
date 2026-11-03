@@ -35,8 +35,7 @@ else
                     <dt>Duration</dt><dd>@CallFormatting.Duration(_summary.StartedAt, _summary.EndedAt)</dd>
                     <dt>Reason</dt><dd>@(_summary.CallReason ?? "Not known yet")</dd>
                     <dt>Category</dt><dd>@(_summary.CallCategory ?? "–")</dd>
-                    <dt>Client</dt><dd>@(_summary.ClaimedClient ?? "–")</dd>
-                    <dt>Matter</dt><dd>@(_summary.CaseReference ?? "–")</dd>
+                    <dt>Case</dt><dd>@(_summary.CaseReference ?? "–")</dd>
                     @if (_summary.QueueReason is not null)
                     {
                         <dt>Queued</dt><dd>@_summary.QueueReason</dd>
@@ -52,9 +51,9 @@ else
                 <MudText Typo="Typo.h6" Class="mb-2">Security</MudText>
                 <MudText Color="@_summary.Verification.Colour()" data-testid="verification-status">@_summary.Verification.Label()</MudText>
                 <MudText Typo="Typo.body2" Class="mud-text-secondary">Failed attempts: @_summary.VerificationAttempts of 3</MudText>
-                @if (_summary.CustomerName is not null)
+                @if (_summary.ClientName is not null)
                 {
-                    <MudText Typo="Typo.body2" Class="mt-2">Verified as <b>@_summary.CustomerName</b></MudText>
+                    <MudText Typo="Typo.body2" Class="mt-2">Verified for <b>@_summary.ClientName</b></MudText>
                 }
             </MudPaper>
 

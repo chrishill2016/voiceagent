@@ -8,12 +8,12 @@ using Microsoft.Extensions.Options;
 using VoiceAgent.Api;
 using VoiceAgent.Api.Features.Agents;
 using VoiceAgent.Api.Features.Calls;
-using VoiceAgent.Api.Features.Customers;
+using VoiceAgent.Api.Features.Cases;
 using VoiceAgent.Api.Features.Media;
 using VoiceAgent.Api.Features.Telephony;
 using VoiceAgent.Api.Features.Tools;
 using VoiceAgent.Api.Features.VoiceLive;
-using VoiceAgent.Core.Customers;
+using VoiceAgent.Core.Cases;
 
 var builder = WebApplication.CreateBuilder(args);
 var config = builder.Configuration;
@@ -46,15 +46,15 @@ if (!string.IsNullOrWhiteSpace(cosmos.Endpoint))
     }));
     builder.Services.AddSingleton(sp => new CosmosCallStore(sp.GetRequiredService<CosmosClient>(), cosmos));
     builder.Services.AddSingleton<ICallStore>(sp => sp.GetRequiredService<CosmosCallStore>());
-    builder.Services.AddSingleton<CosmosCustomerRepository>();
-    builder.Services.AddSingleton<ICustomerRepository>(sp => sp.GetRequiredService<CosmosCustomerRepository>());
+    builder.Services.AddSingleton<CosmosCaseRepository>();
+    builder.Services.AddSingleton<ICaseRepository>(sp => sp.GetRequiredService<CosmosCaseRepository>());
     builder.Services.AddHostedService<SampleDataSeeder>();
     builder.Services.AddSingleton<IAgentStore>(sp => new CosmosAgentStore(sp.GetRequiredService<CosmosClient>(), cosmos));
 }
 else
 {
     builder.Services.AddSingleton<ICallStore, InMemoryCallStore>();
-    builder.Services.AddSingleton<ICustomerRepository>(_ => new InMemoryCustomerRepository(SampleData.LoadCustomers()));
+    builder.Services.AddSingleton<ICaseRepository>(_ => new InMemoryCaseRepository(SampleData.LoadCases()));
     builder.Services.AddSingleton<IAgentStore, InMemoryAgentStore>();
 }
 

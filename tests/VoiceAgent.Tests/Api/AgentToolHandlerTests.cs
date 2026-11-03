@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using VoiceAgent.Api.Features.Calls;
 using VoiceAgent.Core.Agent;
 using VoiceAgent.Shared;
 
@@ -8,11 +9,15 @@ public class AgentToolHandlerTests
 {
     private readonly TestHarness _h = new();
 
-    private async Task<JsonObject> Call(VoiceAgent.Api.Features.Calls.CallSession session, string tool, object args) =>
+    // Case 1042/2617: Amelia Hughes (14/03/1985) and Tom Hughes, previous lender Nationwide Building Society.
+    private static readonly object HughesAnswers = new { full_name = "Amelia Hughes", previous_lender = "Nationwide", date_of_birth = "14/03/1985" };
+    private static readonly object WrongAnswers = new { full_name = "Amelia Hughes", previous_lender = "Halifax", date_of_birth = "1 January 1990" };
+
+    private async Task<JsonObject> Call(CallSession session, string tool, object args) =>
         JsonNode.Parse(await _h.Tools.HandleAsync(session, tool, System.Text.Json.JsonSerializer.Serialize(args)))!.AsObject();
 
     [Fact]
-    public async Task Records_call_reason_and_moves_to_identifying_case()
+    public async Task Records_call_reason_and_moves_to_finding_the_case()
     {
         var session = await _h.StartCallAsync();
 
@@ -23,67 +28,124 @@ public class AgentToolHandlerTests
         Assert.Equal(CallStage.IdentifyingCase, session.Summary.Stage);
     }
 
-    [Fact]
-    public async Task Finding_a_customer_never_reveals_personal_details()
+    [Theory]
+    [InlineData("1042/2617")]
+    [InlineData("1042 2617")]
+    [InlineData("one oh four two stroke two six one seven")]
+    public async Task Finds_the_case_by_case_number_without_revealing_personal_details(string caseNumber)
     {
         var session = await _h.StartCallAsync();
 
-        var result = await Call(session, ToolNames.FindCustomer, new { case_reference = "C V two oh four one" });
+        var result = await Call(session, ToolNames.FindCase, new { case_number = caseNumber });
 
         Assert.True(result["found"]!.GetValue<bool>());
         var json = result.ToJsonString();
-        Assert.DoesNotContain("Amelia", json);
-        Assert.DoesNotContain("lighthouse", json);
-        Assert.Equal("CV2041", session.Summary.CaseReference);
-        Assert.Equal("****4567", session.Summary.ClaimedClient);
+        Assert.DoesNotContain("Hughes", json);
+        Assert.DoesNotContain("Nationwide", json);
+        Assert.Equal("1042/2617", session.Summary.CaseReference);
         Assert.Equal(CallStage.Verifying, session.Summary.Stage);
-        Assert.Null(session.Summary.CustomerName);
+        Assert.Null(session.Summary.ClientName);
     }
 
     [Fact]
-    public async Task Unknown_account_is_reported_as_not_found()
+    public async Task Finds_the_case_by_postcode_and_surname()
     {
         var session = await _h.StartCallAsync();
-        var result = await Call(session, ToolNames.FindCustomer, new { client_number = "99999999" });
+
+        var result = await Call(session, ToolNames.FindCase, new { postcode = "LS6 2QT", surname = "hughes" });
+
+        Assert.True(result["found"]!.GetValue<bool>());
+        Assert.Equal("1042/2617", session.Summary.CaseReference);
+    }
+
+    [Fact]
+    public async Task Postcode_and_surname_prefers_the_open_case_when_others_have_completed()
+    {
+        // Oliver Patel has an open sale (1077/3150) and a completed remortgage (0861/1904) at the same addresses.
+        var session = await _h.StartCallAsync();
+
+        var result = await Call(session, ToolNames.FindCase, new { postcode = "M4 2BS", surname = "Patel" });
+
+        Assert.True(result["found"]!.GetValue<bool>());
+        Assert.Equal("1077/3150", session.Summary.CaseReference);
+    }
+
+    [Fact]
+    public async Task Falls_back_to_postcode_and_surname_when_the_case_number_is_wrong()
+    {
+        var session = await _h.StartCallAsync();
+        var result = await Call(session, ToolNames.FindCase, new { case_number = "9999/9999", postcode = "BT7 1JL", surname = "O'Connor" });
+        Assert.True(result["found"]!.GetValue<bool>());
+        Assert.Equal("1118/5096", session.Summary.CaseReference);
+    }
+
+    [Fact]
+    public async Task Unknown_case_is_reported_as_not_found()
+    {
+        var session = await _h.StartCallAsync();
+        var result = await Call(session, ToolNames.FindCase, new { case_number = "9999/9999" });
         Assert.False(result["found"]!.GetValue<bool>());
+        Assert.Contains("postcode and surname", result["next_step"]!.GetValue<string>());
     }
 
     [Fact]
     public async Task Case_details_are_blocked_until_security_is_passed()
     {
         var session = await _h.StartCallAsync();
-        await Call(session, ToolNames.FindCustomer, new { client_number = "10234567" });
+        await Call(session, ToolNames.FindCase, new { case_number = "1042/2617" });
 
         var blocked = await Call(session, ToolNames.GetCaseDetails, new { });
         Assert.NotNull(blocked["error"]);
         Assert.DoesNotContain("Elm Road", blocked.ToJsonString());
 
-        var verified = await Call(session, ToolNames.VerifyIdentity, new { date_of_birth = "14/03/1985", postcode = "LS14AP", memorable_word = "lighthouse" });
+        var verified = await Call(session, ToolNames.VerifyIdentity, HughesAnswers);
         Assert.True(verified["verified"]!.GetValue<bool>());
-        Assert.Equal("Amelia Hughes", session.Summary.CustomerName);
+        Assert.Equal("Amelia Hughes and Tom Hughes", session.Summary.ClientName);
         Assert.Equal(CallStage.Verified, session.Summary.Stage);
 
         var details = await Call(session, ToolNames.GetCaseDetails, new { });
-        Assert.Contains("CV2041", details.ToJsonString());
-        Assert.Contains("Searches", details.ToJsonString());
-        Assert.Contains("Local authority", details.ToJsonString());
-        Assert.Contains("Friday 4 December 2026", details.ToJsonString());
+        Assert.Equal("1042/2617", details["case_number"]!.GetValue<string>());
+        Assert.Equal("Searches", details["stage"]!.GetValue<string>());
+        Assert.Equal("Local authority", details["waiting_on"]!.GetValue<string>());
+        Assert.Equal("Friday 4 December 2026", details["target_exchange_date"]!.GetValue<string>());
+        Assert.Contains(details["milestones"]!.AsArray(), m => m!["name"]!.GetValue<string>() == "Searches" && m["status"]!.GetValue<string>() == "in progress");
+    }
+
+    [Fact]
+    public async Task Joint_clients_can_answer_with_either_persons_details()
+    {
+        var session = await _h.StartCallAsync();
+        await Call(session, ToolNames.FindCase, new { case_number = "1042/2617" });
+
+        var result = await Call(session, ToolNames.VerifyIdentity, new { full_name = "Tom Hughes", previous_lender = "Nationwide Building Society", date_of_birth = "2nd August 1983" });
+
+        Assert.True(result["verified"]!.GetValue<bool>());
+    }
+
+    [Fact]
+    public async Task First_time_buyers_answer_none_for_previous_lender()
+    {
+        var session = await _h.StartCallAsync();
+        await Call(session, ToolNames.FindCase, new { case_number = "1140/6273" });
+
+        var result = await Call(session, ToolNames.VerifyIdentity, new { full_name = "Priya Shah", previous_lender = "none", date_of_birth = "17 May 1995" });
+
+        Assert.True(result["verified"]!.GetValue<bool>());
     }
 
     [Fact]
     public async Task Three_failed_security_attempts_queue_the_caller_for_an_agent()
     {
         var session = await _h.StartCallAsync();
-        await Call(session, ToolNames.FindCustomer, new { client_number = "10234567" });
-        var wrong = new { date_of_birth = "1 January 1990", postcode = "AB1 2CD", memorable_word = "nope" };
+        await Call(session, ToolNames.FindCase, new { case_number = "1042/2617" });
 
-        var first = await Call(session, ToolNames.VerifyIdentity, wrong);
+        var first = await Call(session, ToolNames.VerifyIdentity, WrongAnswers);
         Assert.Equal(2, first["attempts_remaining"]!.GetValue<int>());
-        var second = await Call(session, ToolNames.VerifyIdentity, wrong);
+        var second = await Call(session, ToolNames.VerifyIdentity, WrongAnswers);
         Assert.Equal(1, second["attempts_remaining"]!.GetValue<int>());
         Assert.Equal(CallStage.Verifying, session.Summary.Stage);
 
-        var third = await Call(session, ToolNames.VerifyIdentity, wrong);
+        var third = await Call(session, ToolNames.VerifyIdentity, WrongAnswers);
 
         Assert.True(third["transferring_to_agent"]!.GetValue<bool>());
         Assert.Equal(CallStage.QueuedForAgent, session.Summary.Stage);
@@ -97,35 +159,36 @@ public class AgentToolHandlerTests
     public async Task Wrong_answers_never_say_which_answer_was_wrong()
     {
         var session = await _h.StartCallAsync();
-        await Call(session, ToolNames.FindCustomer, new { client_number = "10234567" });
+        await Call(session, ToolNames.FindCase, new { case_number = "1042/2617" });
 
-        var result = await Call(session, ToolNames.VerifyIdentity, new { date_of_birth = "14/03/1985", postcode = "LS1 4AP", memorable_word = "wrong" });
+        var result = await Call(session, ToolNames.VerifyIdentity, WrongAnswers);
 
         var json = result.ToJsonString().ToLowerInvariant();
-        Assert.DoesNotContain("memorable", json.Replace("ask all three security questions again", ""));
-        Assert.DoesNotContain("lighthouse", json);
+        Assert.DoesNotContain("lender was", json);
+        Assert.DoesNotContain("nationwide", json);
+        Assert.DoesNotContain("hughes", json);
     }
 
     [Fact]
-    public async Task Verifying_before_finding_an_account_is_rejected()
+    public async Task Verifying_before_finding_a_case_is_rejected()
     {
         var session = await _h.StartCallAsync();
-        var result = await Call(session, ToolNames.VerifyIdentity, new { date_of_birth = "x", postcode = "y", memorable_word = "z" });
+        var result = await Call(session, ToolNames.VerifyIdentity, HughesAnswers);
         Assert.False(result["verified"]!.GetValue<bool>());
         Assert.Equal(0, session.FailedVerificationAttempts);
     }
 
     [Fact]
-    public async Task Switching_account_after_verifying_requires_security_again()
+    public async Task Switching_case_after_verifying_requires_security_again()
     {
         var session = await _h.StartCallAsync();
-        await Call(session, ToolNames.FindCustomer, new { client_number = "10234567" });
-        await Call(session, ToolNames.VerifyIdentity, new { date_of_birth = "14/03/1985", postcode = "LS1 4AP", memorable_word = "lighthouse" });
+        await Call(session, ToolNames.FindCase, new { case_number = "1042/2617" });
+        await Call(session, ToolNames.VerifyIdentity, HughesAnswers);
 
-        await Call(session, ToolNames.FindCustomer, new { client_number = "10987654" });
+        await Call(session, ToolNames.FindCase, new { case_number = "1077/3150" });
 
-        Assert.Null(session.VerifiedCustomer);
-        Assert.Null(session.Summary.CustomerName);
+        Assert.Null(session.VerifiedCase);
+        Assert.Null(session.Summary.ClientName);
         Assert.Equal(CallStage.Verifying, session.Summary.Stage);
     }
 
@@ -133,10 +196,10 @@ public class AgentToolHandlerTests
     public async Task Transfer_tool_queues_the_caller()
     {
         var session = await _h.StartCallAsync();
-        await Call(session, ToolNames.TransferToAgent, new { reason = "Wants to make a complaint" });
+        await Call(session, ToolNames.TransferToAgent, new { reason = "Wants to speak to their case handler" });
 
         Assert.Equal(CallStage.QueuedForAgent, session.Summary.Stage);
-        Assert.Equal("Wants to make a complaint", session.Summary.QueueReason);
+        Assert.Equal("Wants to speak to their case handler", session.Summary.QueueReason);
         Assert.NotNull(session.Summary.QueuedAt);
     }
 
@@ -144,39 +207,7 @@ public class AgentToolHandlerTests
     public async Task Bad_arguments_and_unknown_tools_return_errors_instead_of_throwing()
     {
         var session = await _h.StartCallAsync();
-        Assert.Contains("error", await _h.Tools.HandleAsync(session, ToolNames.FindCustomer, "{not json"));
+        Assert.Contains("error", await _h.Tools.HandleAsync(session, ToolNames.FindCase, "{not json"));
         Assert.Contains("error", await _h.Tools.HandleAsync(session, "delete_everything", "{}"));
-    }
-
-    [Fact]
-    public async Task Completed_matters_are_left_out_of_the_progress_update_unless_asked_for()
-    {
-        var session = await _h.StartCallAsync();
-        await Call(session, ToolNames.FindCustomer, new { client_number = "10987654" });
-        await Call(session, ToolNames.VerifyIdentity, new { date_of_birth = "2nd November 1972", postcode = "M4 2BS", memorable_word = "marmalade" });
-
-        var open = (await Call(session, ToolNames.GetCaseDetails, new { })).ToJsonString();
-        Assert.Contains("CV2077", open);
-        Assert.DoesNotContain("CV1532", open);
-
-        var asked = (await Call(session, ToolNames.GetCaseDetails, new { case_reference = "CV1532" })).ToJsonString();
-        Assert.Contains("Remortgage", asked);
-    }
-
-    [Fact]
-    public async Task Progress_update_includes_milestones_and_who_it_is_waiting_on()
-    {
-        var session = await _h.StartCallAsync();
-        await Call(session, ToolNames.FindCustomer, new { case_reference = "CV2118" });
-        await Call(session, ToolNames.VerifyIdentity, new { date_of_birth = "9 January 1968", postcode = "BT1 5GS", memorable_word = "harbour" });
-
-        var details = await Call(session, ToolNames.GetCaseDetails, new { });
-        var matter = details["matters"]!.AsArray().Single()!;
-
-        Assert.Equal("Exchanged", matter["stage"]!.GetValue<string>());
-        Assert.Equal("Niamh Byrne", matter["case_handler"]!.GetValue<string>());
-        Assert.Contains("You", matter["waiting_on"]!.GetValue<string>());
-        Assert.Equal("Friday 13 November 2026", matter["completion_date"]!.GetValue<string>());
-        Assert.Contains(matter["milestones"]!.AsArray(), m => m!["name"]!.GetValue<string>() == "Exchange of contracts" && m["status"]!.GetValue<string>() == "done");
     }
 }

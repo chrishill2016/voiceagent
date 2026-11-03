@@ -36,11 +36,11 @@ public class CallDetailPageTests : PortalTestBase
         Live.RaiseCallUpdated(Calls.Make("call-11", CallStage.Verified) with
         {
             Verification = VerificationStatus.Passed,
-            CustomerName = "Amelia Hughes",
+            ClientName = "Amelia Hughes and Tom Hughes",
         });
 
         page.WaitForAssertion(() => Assert.Contains("Passed", page.Find("[data-testid=verification-status]").TextContent));
-        Assert.Contains("Amelia Hughes", page.Markup);
+        Assert.Contains("Amelia Hughes and Tom Hughes", page.Markup);
     }
 
     [Fact]
