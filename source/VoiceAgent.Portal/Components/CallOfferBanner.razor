@@ -1,0 +1,88 @@
+@implements IDisposable
+@inject AgentProfile Profile
+@inject ILiveCalls LiveCalls
+@inject ICallsApi Api
+@inject ISnackbar Snackbar
+
+@if (Offer is { } call)
+{
+    <div class="call-offer" data-testid="call-offer">
+        <MudPaper Elevation="8" Class="pa-4">
+            <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="3" Wrap="Wrap.Wrap">
+                <MudIcon Icon="@Icons.Material.Filled.RingVolume" Color="Color.Success" Size="Size.Large" />
+                <div class="flex-grow-1">
+                    <MudText Typo="Typo.subtitle1"><b>Call for you</b> · @call.CallerNumber</MudText>
+                    <MudText Typo="Typo.body2">
+                        @(call.QueueReason ?? "Caller waiting")
+                        @if (call.CaseReference is not null) { <span> · Matter @call.CaseReference</span> }
+                        · Security: @call.Verification.Label()
+                    </MudText>
+                </div>
+                <MudText Typo="Typo.h6" data-testid="offer-countdown">@CallFormatting.SecondsLeft(call.OfferExpiresAt)</MudText>
+                <MudButton Variant="Variant.Outlined" OnClick="() => DeclineAsync(call)" Disabled="_busy">Decline</MudButton>
+                <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.Call"
+                           OnClick="() => AcceptAsync(call)" Disabled="_busy" data-testid="accept-offer">Accept</MudButton>
+            </MudStack>
+        </MudPaper>
+    </div>
+}
+
+@code {
+    private Timer? _timer;
+    private bool _busy;
+
+    private CallSummary? Offer => Profile.AgentId is { } me
+        ? LiveCalls.ActiveCalls.FirstOrDefault(c => c.Stage == CallStage.QueuedForAgent && c.OfferedToAgentId == me)
+        : null;
+
+    protected override void OnInitialized()
+    {
+        LiveCalls.Changed += OnChanged;
+        Profile.Changed += OnChanged;
+        _timer = new Timer(_ => { if (Offer is not null) OnChanged(); }, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+    }
+
+    private async Task AcceptAsync(CallSummary call)
+    {
+        _busy = true;
+        try
+        {
+            var result = await Api.TakeCallAsync(call.Id, Profile.AgentId!);
+            Snackbar.Add(result.Message, result.Success ? Severity.Success : Severity.Error);
+        }
+        catch (HttpRequestException)
+        {
+            Snackbar.Add("Couldn't reach the server. Try again.", Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task DeclineAsync(CallSummary call)
+    {
+        _busy = true;
+        try
+        {
+            await Api.DeclineCallAsync(call.Id, Profile.AgentId!);
+        }
+        catch (HttpRequestException)
+        {
+            Snackbar.Add("Couldn't reach the server. Try again.", Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        LiveCalls.Changed -= OnChanged;
+        Profile.Changed -= OnChanged;
+        _timer?.Dispose();
+    }
+}

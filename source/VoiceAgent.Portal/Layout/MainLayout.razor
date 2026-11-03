@@ -11,7 +11,7 @@
     <MudAppBar Elevation="1" Dense="true">
         <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="() => _drawerOpen = !_drawerOpen" aria-label="Toggle navigation" />
         <MudIcon Icon="@Icons.Material.Filled.HeadsetMic" Class="mr-2" />
-        <MudText Typo="Typo.h6">Customer Services Portal</MudText>
+        <MudText Typo="Typo.h6">Client Services Portal</MudText>
         <MudSpacer />
         @if (LiveCalls.Queue.Count > 0)
         {
@@ -19,15 +19,17 @@
                 <MudIconButton Icon="@Icons.Material.Filled.HourglassTop" Color="Color.Inherit" Href="" aria-label="Callers waiting" />
             </MudBadge>
         }
+        <AgentStatusMenu />
         <ConnectionIndicator />
     </MudAppBar>
 
     <MudDrawer @bind-Open="_drawerOpen" Elevation="1" ClipMode="DrawerClipMode.Always" Variant="DrawerVariant.Responsive">
         <MudNavMenu>
             <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Phone">Live calls</MudNavLink>
+            <MudNavLink Href="agents" Icon="@Icons.Material.Filled.SupportAgent">Agents</MudNavLink>
             <MudNavLink Href="history" Icon="@Icons.Material.Filled.History">Call history</MudNavLink>
             <MudNavLink Href="test-call" Icon="@Icons.Material.Filled.Mic">Test call</MudNavLink>
-            <MudNavLink Href="sample-data" Icon="@Icons.Material.Filled.Dataset">Sample customers</MudNavLink>
+            <MudNavLink Href="sample-data" Icon="@Icons.Material.Filled.Dataset">Sample clients</MudNavLink>
         </MudNavMenu>
     </MudDrawer>
 
@@ -36,11 +38,12 @@
             @Body
         </MudContainer>
         <footer class="app-footer">
-            <MudText Typo="Typo.caption">Customer Services Portal · v@(AppVersion.Current)</MudText>
+            <MudText Typo="Typo.caption">Client Services Portal · v@(AppVersion.Current)</MudText>
         </footer>
     </MudMainContent>
 </MudLayout>
 
+<CallOfferBanner />
 <UpdatePrompt />
 
 @code {

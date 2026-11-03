@@ -15,7 +15,7 @@
           RowStyle="cursor: pointer;" Filter="Matches">
     <ToolBarContent>
         <MudSpacer />
-        <MudTextField @bind-Value="_search" Placeholder="Search caller, reason, case" Adornment="Adornment.Start"
+        <MudTextField @bind-Value="_search" Placeholder="Search caller, reason, matter" Adornment="Adornment.Start"
                       AdornmentIcon="@Icons.Material.Filled.Search" Immediate="true" Class="mt-0" />
     </ToolBarContent>
     <HeaderContent>
@@ -23,7 +23,7 @@
         <MudTh>Caller</MudTh>
         <MudTh>Duration</MudTh>
         <MudTh>Reason</MudTh>
-        <MudTh>Case</MudTh>
+        <MudTh>Matter</MudTh>
         <MudTh>Security</MudTh>
         <MudTh>Outcome</MudTh>
     </HeaderContent>
@@ -32,7 +32,7 @@
         <MudTd DataLabel="Caller">@context.CallerNumber</MudTd>
         <MudTd DataLabel="Duration">@CallFormatting.Duration(context.StartedAt, context.EndedAt)</MudTd>
         <MudTd DataLabel="Reason">@(context.CallReason ?? "–")</MudTd>
-        <MudTd DataLabel="Case">@(context.CaseReference ?? "–")</MudTd>
+        <MudTd DataLabel="Matter">@(context.CaseReference ?? "–")</MudTd>
         <MudTd DataLabel="Security"><MudText Typo="Typo.body2" Color="@context.Verification.Colour()">@context.Verification.Label()</MudText></MudTd>
         <MudTd DataLabel="Outcome">@Outcome(context)</MudTd>
     </RowTemplate>
@@ -61,7 +61,7 @@
 
     private bool Matches(CallSummary call) =>
         string.IsNullOrWhiteSpace(_search)
-        || new[] { call.CallerNumber, call.CallReason, call.CaseReference, call.CustomerName, call.ClaimedAccount }
+        || new[] { call.CallerNumber, call.CallReason, call.CaseReference, call.CustomerName, call.ClaimedClient }
             .Any(v => v?.Contains(_search, StringComparison.OrdinalIgnoreCase) == true);
 
     private static string Outcome(CallSummary call) => call switch

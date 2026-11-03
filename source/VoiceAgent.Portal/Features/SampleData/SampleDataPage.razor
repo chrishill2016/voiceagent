@@ -1,32 +1,37 @@
 @page "/sample-data"
 @inject ICallsApi Api
 
-<PageTitle>Sample customers</PageTitle>
+<PageTitle>Sample clients</PageTitle>
 
-<MudText Typo="Typo.h4" id="h1" Class="mb-2">Sample customers</MudText>
+<MudText Typo="Typo.h4" id="h1" Class="mb-2">Sample clients</MudText>
 <MudAlert Severity="Severity.Warning" Class="mb-4">
-    Fictional demo data, including the answers to the security questions, so you can test calls.
+    Fictional clients and conveyancing matters, including the answers to the security questions, so you can test calls.
     Turn this page off in production with <code>Demo__ShowSampleData=false</code>.
 </MudAlert>
 
 <MudTable Items="_customers" Loading="_loading" Dense="true" Elevation="1">
     <HeaderContent>
         <MudTh>Name</MudTh>
-        <MudTh>Account number</MudTh>
+        <MudTh>Client number</MudTh>
         <MudTh>Phone</MudTh>
         <MudTh>Date of birth</MudTh>
         <MudTh>Postcode</MudTh>
         <MudTh>Memorable word</MudTh>
-        <MudTh>Cases</MudTh>
+        <MudTh>Matters</MudTh>
     </HeaderContent>
     <RowTemplate>
         <MudTd DataLabel="Name">@context.Name</MudTd>
-        <MudTd DataLabel="Account number">@context.AccountNumber</MudTd>
+        <MudTd DataLabel="Client number">@context.ClientNumber</MudTd>
         <MudTd DataLabel="Phone">@context.PhoneNumber</MudTd>
         <MudTd DataLabel="Date of birth">@context.DateOfBirth.ToString("d MMMM yyyy")</MudTd>
         <MudTd DataLabel="Postcode">@context.Postcode</MudTd>
         <MudTd DataLabel="Memorable word">@context.MemorableWord</MudTd>
-        <MudTd DataLabel="Cases">@(context.CaseReferences.Count == 0 ? "–" : string.Join(", ", context.CaseReferences))</MudTd>
+        <MudTd DataLabel="Matters">
+            @foreach (var matter in context.Matters)
+            {
+                <div>@matter</div>
+            }
+        </MudTd>
     </RowTemplate>
     <NoRecordsContent><MudText>Sample data is turned off.</MudText></NoRecordsContent>
 </MudTable>

@@ -4,6 +4,7 @@ using System.Threading.Channels;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using VoiceAgent.Api;
+using VoiceAgent.Api.Features.Agents;
 using VoiceAgent.Api.Features.Calls;
 using VoiceAgent.Api.Features.Media;
 using VoiceAgent.Api.Features.Telephony;
@@ -23,17 +24,26 @@ public sealed class RecordingNotifier : ICallNotifier
     public Task CallUpdatedAsync(CallSummary summary) { lock (Summaries) Summaries.Add(summary); return Task.CompletedTask; }
     public Task TranscriptAddedAsync(TranscriptUpdate update) { lock (Transcripts) Transcripts.Add(update); return Task.CompletedTask; }
     public Task CallEventAddedAsync(CallEventUpdate update) { lock (Events) Events.Add(update); return Task.CompletedTask; }
+    public List<AgentInfo> Agents { get; } = [];
+    public Task AgentUpdatedAsync(AgentInfo agent) { lock (Agents) Agents.Add(agent); return Task.CompletedTask; }
 }
 
 public sealed class FakeCallControl : ICallControl
 {
     public bool TransferConfigured { get; set; }
-    public int Transfers { get; private set; }
+    public bool FailTransfers { get; set; }
+    public List<string> TransferTargets { get; } = [];
+    public int Transfers => TransferTargets.Count;
     public int HoldMusicStarts { get; private set; }
 
     public bool CanTransfer(CallSession session) => TransferConfigured && session.CallConnectionId is not null;
     public Task StartHoldMusicAsync(CallSession session, CancellationToken ct = default) { HoldMusicStarts++; return Task.CompletedTask; }
-    public Task TransferToAgentAsync(CallSession session, CancellationToken ct = default) { Transfers++; return Task.CompletedTask; }
+    public Task TransferToAgentAsync(CallSession session, string transferTarget, CancellationToken ct = default)
+    {
+        if (FailTransfers) throw new InvalidOperationException("Target busy");
+        TransferTargets.Add(transferTarget);
+        return Task.CompletedTask;
+    }
 }
 
 /// <summary>A fake Voice Live service: the test pushes events, and inspects what the bridge sent.</summary>
@@ -99,13 +109,17 @@ public sealed class TestHarness
     public FakeCallControl CallControl { get; } = new();
     public FakeVoiceLive VoiceLive { get; } = new();
     public CallTracker Tracker { get; }
+    public ManualTime Time { get; } = new();
+    public AgentDirectory Agents { get; }
     public AgentQueue Queue { get; }
     public AgentToolHandler Tools { get; }
 
     public TestHarness()
     {
-        Tracker = new CallTracker(Store, Notifier, TimeProvider.System, NullLogger<CallTracker>.Instance);
-        Queue = new AgentQueue(Tracker, CallControl, TimeProvider.System);
+        Tracker = new CallTracker(Store, Notifier, Time, NullLogger<CallTracker>.Instance);
+        Agents = new AgentDirectory(new InMemoryAgentStore(), Notifier, Time, NullLogger<AgentDirectory>.Instance);
+        Queue = new AgentQueue(Tracker, Agents, CallControl, Time,
+            Options.Create(new QueueOptions { OfferTimeoutSeconds = 20, DeclineCooldownSeconds = 60 }));
         Tools = new AgentToolHandler(new InMemoryCustomerRepository(SampleData.LoadCustomers()), Tracker, Queue, NullLogger<AgentToolHandler>.Instance);
     }
 
@@ -116,6 +130,16 @@ public sealed class TestHarness
 
     public Task<CallSession> StartCallAsync(bool isTestCall = true) =>
         Tracker.StartAsync(Guid.NewGuid().ToString("n"), "+447700900101", isTestCall);
+
+    /// <summary>Creates an agent and sets their status (Available by default).</summary>
+    public async Task<AgentInfo> AgentAsync(string name, string target, AgentStatus status = AgentStatus.Available)
+    {
+        var created = await Agents.CreateAsync(new SaveAgentRequest(name, target));
+        Assert.True(created.Success, created.Message);
+        Time.Advance(TimeSpan.FromSeconds(1));
+        await Agents.SetStatusAsync(created.Agent!.Id, status);
+        return Agents.Get(created.Agent.Id)!;
+    }
 
     public static Customer Amelia => SampleData.LoadCustomers().Single(c => c.Id == "cust-001");
 }
@@ -131,4 +155,12 @@ public static class Eventually
         }
         Assert.Fail($"Timed out waiting until {because}");
     }
+}
+
+/// <summary>A clock the tests move forward by hand, so offer timeouts are deterministic.</summary>
+public sealed class ManualTime : TimeProvider
+{
+    private DateTimeOffset _now = new(2026, 11, 3, 10, 0, 0, TimeSpan.Zero);
+    public override DateTimeOffset GetUtcNow() => _now;
+    public void Advance(TimeSpan by) => _now += by;
 }

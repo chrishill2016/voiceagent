@@ -2,13 +2,15 @@
 
 The portal and voice agent are for a **conveyancing firm**. Most callers are clients asking for a progress update on their existing case.
 
+## Done
+- Conveyancing sample data and agent instructions.
+- Agent status (Available / Busy / Wrap-up / Offline), calls offered to the longest-idle available agent, and a transfer target for each agent.
+
 ## Next
-- **Conveyancing sample data and agent instructions.** Replace the broadband-style sample cases with conveyancing matters (sale or purchase, property address, milestones such as searches, enquiries, exchange and completion, plus the next step and who is responsible for it). Update the agent's instructions so it gives a clear progress update in plain English.
 - **Entra ID sign-in for the portal.** Protect the portal, API and SignalR hub with Microsoft Entra ID (MSAL in Blazor WebAssembly, JWT bearer on the API). Use the signed-in user's name for **Take call** instead of the name stored in the browser. Webhook and media endpoints stay on their own token or ACS JWT validation.
 - **Validate ACS webhook JWTs.** Check the Call Automation callback and media streaming JWTs as well as the shared `?token=`.
 - **Light mode.** Add a light/dark toggle to the portal's app bar, stick with dark by default, and remember the choice on each device (or follow the system setting).
 - **Real case data.** Replace the sample dataset with a connector to the case management system behind `ICustomerRepository`, and turn off `Demo__ShowSampleData`.
-- **Agent status and assignment.** Agents set themselves to Available, Busy or Wrap-up, and queued calls are only offered to available agents. Each agent has their own transfer target, so two agents can take two calls at once (today every taken call goes to one shared `Acs__AgentTransferTarget`).
 
 ## For callers
 - **Opening hours.** Outside opening hours, the agent still gives progress updates but offers a callback or voicemail instead of queuing callers for agents who aren't there.

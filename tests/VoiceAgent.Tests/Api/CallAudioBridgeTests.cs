@@ -22,7 +22,7 @@ public class CallAudioBridgeTests
         _h.VoiceLive.Push(new VoiceLiveEvent.AudioDelta("BBB="));
         _h.VoiceLive.Push(new VoiceLiveEvent.AgentTranscript("Thanks for calling."));
         _h.VoiceLive.Push(new VoiceLiveEvent.CallerStartedSpeaking());
-        _h.VoiceLive.Push(new VoiceLiveEvent.CallerTranscript("My broadband is slow."));
+        _h.VoiceLive.Push(new VoiceLiveEvent.CallerTranscript("When will I exchange?"));
 
         await Eventually.TrueAsync(() => session.Snapshot().Transcript.Count == 2, "both transcript lines arrive");
         await Eventually.TrueAsync(() => _h.VoiceLive.SentTypes.Contains("input_audio_buffer.append"), "caller audio reaches Voice Live");
@@ -46,7 +46,7 @@ public class CallAudioBridgeTests
         var run = _h.Bridge(new VoiceLiveOptions { GreetOnConnect = false }).RunAsync(session, _caller, CancellationToken.None);
         await Eventually.TrueAsync(() => _h.VoiceLive.SentTypes.Contains("session.update"), "session configured");
 
-        _h.VoiceLive.Push(new VoiceLiveEvent.FunctionCall("call-1", ToolNames.FindCustomer, """{"account_number":"10234567"}"""));
+        _h.VoiceLive.Push(new VoiceLiveEvent.FunctionCall("call-1", ToolNames.FindCustomer, """{"client_number":"10234567"}"""));
         _h.VoiceLive.Push(new VoiceLiveEvent.ResponseDone());
 
         await Eventually.TrueAsync(() => _h.VoiceLive.SentTypes.Contains("response.create"), "agent asked to continue");

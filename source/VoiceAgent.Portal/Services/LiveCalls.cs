@@ -21,6 +21,7 @@ public interface ILiveCalls
     DateTimeOffset? LastUpdate { get; }
     IReadOnlyList<CallSummary> ActiveCalls { get; }
     IReadOnlyList<CallSummary> Queue { get; }
+    IReadOnlyList<AgentInfo> Agents { get; }
 
     event Action? Changed;
     event Action<CallSummary>? CallUpdated;
@@ -28,11 +29,15 @@ public interface ILiveCalls
     event Action<CallEventUpdate>? CallEventAdded;
 
     Task StartAsync();
+
+    /// <summary>Applies an agent change straight away (the server also broadcasts it).</summary>
+    void ApplyAgent(AgentInfo agent);
 }
 
 public sealed class LiveCalls(NavigationManager navigation, ICallsApi api) : ILiveCalls, IAsyncDisposable
 {
     private readonly Dictionary<string, CallSummary> _calls = [];
+    private readonly Dictionary<string, AgentInfo> _agents = [];
     private readonly Lock _gate = new();
     private HubConnection? _hub;
 
@@ -48,6 +53,11 @@ public sealed class LiveCalls(NavigationManager navigation, ICallsApi api) : ILi
         .Where(c => c.Stage == CallStage.QueuedForAgent)
         .OrderBy(c => c.QueuedAt)
         .ToList();
+
+    public IReadOnlyList<AgentInfo> Agents
+    {
+        get { lock (_gate) return _agents.Values.OrderBy(a => a.Name, StringComparer.OrdinalIgnoreCase).ToList(); }
+    }
 
     public event Action? Changed;
     public event Action<CallSummary>? CallUpdated;
@@ -75,6 +85,7 @@ public sealed class LiveCalls(NavigationManager navigation, ICallsApi api) : ILi
             TranscriptAdded?.Invoke(update);
             Touch();
         });
+        _hub.On<AgentInfo>(CallsHub.AgentUpdated, ApplyAgent);
         _hub.On<CallEventUpdate>(CallsHub.CallEventAdded, update =>
         {
             CallEventAdded?.Invoke(update);
@@ -114,10 +125,13 @@ public sealed class LiveCalls(NavigationManager navigation, ICallsApi api) : ILi
     private async Task LoadActiveAsync()
     {
         var active = await api.GetActiveAsync();
+        var agents = await api.GetAgentsAsync();
         lock (_gate)
         {
             _calls.Clear();
             foreach (var call in active) _calls[call.Id] = call;
+            _agents.Clear();
+            foreach (var agent in agents) _agents[agent.Id] = agent;
         }
         Touch();
     }
@@ -129,6 +143,16 @@ public sealed class LiveCalls(NavigationManager navigation, ICallsApi api) : ILi
             if (summary.Stage == CallStage.Ended) _calls.Remove(summary.Id);
             else _calls[summary.Id] = summary;
         }
+    }
+
+    public void ApplyAgent(AgentInfo agent)
+    {
+        lock (_gate)
+        {
+            if (_agents.TryGetValue(agent.Id, out var existing) && existing.LastModified > agent.LastModified) return;
+            _agents[agent.Id] = agent;
+        }
+        Touch();
     }
 
     private void Touch()

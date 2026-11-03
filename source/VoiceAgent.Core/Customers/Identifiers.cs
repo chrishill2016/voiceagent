@@ -35,7 +35,7 @@ public static class Identifiers
         return sb.ToString();
     }
 
-    public static string NormaliseAccountNumber(string? value) => new(AlphaNumeric(value).Where(char.IsDigit).ToArray());
+    public static string NormaliseClientNumber(string? value) => new(AlphaNumeric(value).Where(char.IsDigit).ToArray());
 
     public static string NormaliseCaseReference(string? value) => AlphaNumeric(value);
 

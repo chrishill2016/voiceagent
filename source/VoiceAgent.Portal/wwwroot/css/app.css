@@ -144,3 +144,14 @@ html, body { background: #0f1320; }
     opacity: 0.7;
     margin-bottom: 2px;
 }
+
+.call-offer {
+    position: fixed;
+    top: 64px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1900;
+    width: min(760px, calc(100vw - 32px));
+}
+
+.agent-menu .mud-button { text-transform: none; }

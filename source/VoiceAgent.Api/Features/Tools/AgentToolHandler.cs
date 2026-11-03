@@ -62,12 +62,12 @@ public sealed class AgentToolHandler(
         });
         await tracker.AddEventAsync(session, $"Reason for call: {reason} ({category})");
 
-        return Output(new { recorded = true, next_step = "Ask for the account number or case reference." });
+        return Output(new { recorded = true, next_step = "Ask for the matter reference or client number." });
     }
 
     private async Task<string> FindCustomerAsync(CallSession session, JsonObject args, CancellationToken ct)
     {
-        var accountNumber = Str(args, "account_number");
+        var clientNumber = Str(args, "client_number");
         var caseReference = Str(args, "case_reference");
 
         Customer? customer = null;
@@ -83,12 +83,12 @@ public sealed class AgentToolHandler(
             }
         }
 
-        if (customer is null && !string.IsNullOrWhiteSpace(accountNumber))
-            customer = await customers.FindByAccountNumberAsync(accountNumber, ct);
+        if (customer is null && !string.IsNullOrWhiteSpace(clientNumber))
+            customer = await customers.FindByClientNumberAsync(clientNumber, ct);
 
         if (customer is null)
         {
-            await tracker.AddEventAsync(session, $"No account found for {Describe(accountNumber, caseReference)}");
+            await tracker.AddEventAsync(session, $"No client found for {Describe(clientNumber, caseReference)}");
             return Output(new
             {
                 found = false,
@@ -101,7 +101,7 @@ public sealed class AgentToolHandler(
 
         await tracker.UpdateAsync(session, s => s with
         {
-            ClaimedAccount = customer.MaskedAccountNumber,
+            ClaimedClient = customer.MaskedClientNumber,
             CaseReference = matchedCase ?? s.CaseReference,
             Stage = verified ? CallStage.Verified : CallStage.Verifying,
             Verification = verified ? VerificationStatus.Passed : VerificationStatus.InProgress,
@@ -109,7 +109,7 @@ public sealed class AgentToolHandler(
             CustomerId = verified ? s.CustomerId : null,
             VerificationAttempts = session.FailedVerificationAttempts,
         });
-        await tracker.AddEventAsync(session, $"Account {customer.MaskedAccountNumber} found{(matchedCase is null ? "" : $" from case {matchedCase}")}; security check required");
+        await tracker.AddEventAsync(session, $"Client {customer.MaskedClientNumber} found{(matchedCase is null ? "" : $" from matter {matchedCase}")}; security check required");
 
         return Output(new
         {
@@ -125,7 +125,7 @@ public sealed class AgentToolHandler(
     {
         var customer = session.ClaimedCustomer;
         if (customer is null)
-            return Output(new { verified = false, error = "No account has been found yet. Call find_customer first." });
+            return Output(new { verified = false, error = "No client has been found yet. Call find_customer first." });
 
         if (session.Summary.Stage == CallStage.QueuedForAgent)
             return Output(new { verified = false, transferring_to_agent = true, next_step = "The caller is already waiting for a colleague." });
@@ -186,31 +186,51 @@ public sealed class AgentToolHandler(
         var cases = customer.Cases
             .Where(c => reference is null
                 || Identifiers.NormaliseCaseReference(c.Reference) == Identifiers.NormaliseCaseReference(reference))
-            .Where(c => reference is not null || !c.Status.Equals("Closed", StringComparison.OrdinalIgnoreCase))
+            .Where(c => reference is not null || !c.IsCompleted)
             .ToList();
 
         if (cases.Count == 1)
             await tracker.UpdateAsync(session, s => s with { CaseReference = cases[0].Reference });
 
         await tracker.AddEventAsync(session, cases.Count == 0
-            ? "No open cases found"
-            : $"Shared case details: {string.Join(", ", cases.Select(c => c.Reference))}");
+            ? "No open matters found"
+            : $"Shared progress update: {string.Join(", ", cases.Select(c => $"{c.Reference} ({c.Stage})"))}");
 
         return Output(new
         {
-            customer_first_name = customer.FirstName,
-            cases = cases.Select(c => new
+            client_first_name = customer.FirstName,
+            matters = cases.Select(c => new
             {
                 reference = c.Reference,
-                title = c.Title,
-                status = c.Status,
-                opened_on = c.OpenedOn.ToString("d MMMM yyyy"),
+                matter_type = c.MatterType,
+                property = c.PropertyAddress,
+                stage = c.Stage,
+                case_handler = c.CaseHandler,
                 latest_update = c.LatestUpdate,
+                waiting_on = c.WaitingOn,
                 next_step = c.NextStep,
+                target_exchange_date = SpokenDate(c.TargetExchangeDate),
+                completion_date = SpokenDate(c.CompletionDate),
+                last_updated = SpokenDate(c.LastUpdatedOn),
+                milestones = c.Milestones.Select(m => new
+                {
+                    name = m.Name,
+                    status = m.Status switch
+                    {
+                        MilestoneStatus.Done => "done",
+                        MilestoneStatus.InProgress => "in progress",
+                        _ => "not started",
+                    },
+                    completed_on = SpokenDate(m.CompletedOn),
+                }),
             }),
-            note = cases.Count == 0 ? "There are no open cases. Ask how else you can help, or offer a transfer." : null,
+            note = cases.Count == 0
+                ? "There are no open matters. Ask how else you can help, or offer a transfer."
+                : null,
         });
     }
+
+    private static string? SpokenDate(DateOnly? date) => date?.ToString("dddd d MMMM yyyy");
 
     private async Task<string> TransferAsync(CallSession session, JsonObject args)
     {
@@ -226,8 +246,8 @@ public sealed class AgentToolHandler(
     private static string? Str(JsonObject args, string name) =>
         args[name] is JsonValue v && v.TryGetValue<string>(out var s) && !string.IsNullOrWhiteSpace(s) ? s.Trim() : null;
 
-    private static string Describe(string? account, string? caseRef) =>
-        caseRef is not null ? $"case reference '{caseRef}'" : account is not null ? $"account number '{account}'" : "no number given";
+    private static string Describe(string? clientNumber, string? caseRef) =>
+        caseRef is not null ? $"matter reference '{caseRef}'" : clientNumber is not null ? $"client number '{clientNumber}'" : "no number given";
 
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web)
     {

@@ -34,7 +34,7 @@ public class ComponentTests : PortalTestBase
         var view = Render<TranscriptView>(p => p.Add(x => x.Entries, new List<TranscriptEntry>
         {
             new(Speaker.Agent, "How can I help?", DateTimeOffset.UtcNow),
-            new(Speaker.Caller, "Billing question", DateTimeOffset.UtcNow),
+            new(Speaker.Caller, "When do we complete?", DateTimeOffset.UtcNow),
         }));
 
         Assert.Contains("Voice agent", view.Markup);

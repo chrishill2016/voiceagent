@@ -9,15 +9,15 @@ public class IdentifiersTests
     [InlineData("one oh two three four five six seven", "10234567")]
     [InlineData("10-23-45-67", "10234567")]
     public void Account_numbers_are_normalised_from_speech(string spoken, string expected) =>
-        Assert.Equal(expected, Identifiers.NormaliseAccountNumber(spoken));
+        Assert.Equal(expected, Identifiers.NormaliseClientNumber(spoken));
 
     [Theory]
-    [InlineData("CS1042")]
-    [InlineData("cs 1042")]
-    [InlineData("C S one zero four two")]
-    [InlineData("CS-1042.")]
+    [InlineData("CV2041")]
+    [InlineData("cv 2041")]
+    [InlineData("C V two oh four one")]
+    [InlineData("CV-2041.")]
     public void Case_references_are_normalised_from_speech(string spoken) =>
-        Assert.Equal("CS1042", Identifiers.NormaliseCaseReference(spoken));
+        Assert.Equal("CV2041", Identifiers.NormaliseCaseReference(spoken));
 
     [Theory]
     [InlineData("+447700900101")]
@@ -28,5 +28,5 @@ public class IdentifiersTests
 
     [Fact]
     public void Account_numbers_are_masked() =>
-        Assert.Equal("****4567", TestHarness.Amelia.MaskedAccountNumber);
+        Assert.Equal("****4567", TestHarness.Amelia.MaskedClientNumber);
 }

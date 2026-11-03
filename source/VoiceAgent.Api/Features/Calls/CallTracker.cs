@@ -10,6 +10,9 @@ public sealed class CallTracker(ICallStore store, ICallNotifier notifier, TimePr
 {
     private readonly ConcurrentDictionary<string, CallSession> _active = new();
 
+    /// <summary>Raised after a call has ended and been removed from the live list.</summary>
+    public event Func<CallSummary, Task>? CallEnded;
+
     public async Task<CallSession> StartAsync(string callId, string callerNumber, bool isTestCall)
     {
         var now = time.GetUtcNow();
@@ -67,8 +70,18 @@ public sealed class CallTracker(ICallStore store, ICallNotifier notifier, TimePr
 
         session.StopAi();
         session.AddEvent(new CallEvent(reason, time.GetUtcNow()));
-        session.Apply(s => s with { Stage = CallStage.Ended, EndedAt = time.GetUtcNow() }, time.GetUtcNow());
+        var ended = session.Apply(s => s with
+        {
+            Stage = CallStage.Ended,
+            EndedAt = time.GetUtcNow(),
+            OfferedToAgentId = null,
+            OfferedToAgentName = null,
+            OfferExpiresAt = null,
+        }, time.GetUtcNow());
         await PublishAsync(session, notifySummary: true);
+
+        if (CallEnded is { } handler)
+            await SafeAsync(() => handler(ended));
     }
 
     private async Task PublishAsync(CallSession session, bool notifySummary)

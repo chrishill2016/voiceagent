@@ -10,7 +10,7 @@ public interface ICallControl
 {
     bool CanTransfer(CallSession session);
     Task StartHoldMusicAsync(CallSession session, CancellationToken ct = default);
-    Task TransferToAgentAsync(CallSession session, CancellationToken ct = default);
+    Task TransferToAgentAsync(CallSession session, string transferTarget, CancellationToken ct = default);
 }
 
 public sealed class AcsCallControl(
@@ -21,7 +21,7 @@ public sealed class AcsCallControl(
     private readonly AcsOptions _options = options.Value;
 
     public bool CanTransfer(CallSession session) =>
-        client is not null && session.CallConnectionId is not null && !string.IsNullOrWhiteSpace(_options.AgentTransferTarget);
+        client is not null && session.CallConnectionId is not null;
 
     public async Task StartHoldMusicAsync(CallSession session, CancellationToken ct = default)
     {
@@ -40,10 +40,10 @@ public sealed class AcsCallControl(
         }
     }
 
-    public async Task TransferToAgentAsync(CallSession session, CancellationToken ct = default)
+    public async Task TransferToAgentAsync(CallSession session, string transferTarget, CancellationToken ct = default)
     {
         if (!CanTransfer(session))
-            throw new InvalidOperationException("Call transfer is not configured. Set Acs__AgentTransferTarget.");
+            throw new InvalidOperationException("This call can't be transferred because telephony isn't configured.");
 
         var connection = client!.GetCallConnection(session.CallConnectionId!);
         try
@@ -55,7 +55,7 @@ public sealed class AcsCallControl(
             logger.LogDebug(ex, "No media operations to cancel for call {CallId}", session.Id);
         }
 
-        var target = CommunicationIdentifier.FromRawId(ToRawId(_options.AgentTransferTarget!));
+        var target = CommunicationIdentifier.FromRawId(ToRawId(transferTarget));
         await connection.TransferCallToParticipantAsync(target, ct);
     }
 

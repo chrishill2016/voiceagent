@@ -67,7 +67,7 @@ Use `--dry-run` to print the JSON without calling Azure. If your Foundry version
 Then, in the Foundry portal:
 1. Open **Agents → customer-service-voice-agent**.
 2. If there is a **Voice Live** or **Voice** option, turn it on, and pick the voice `en-GB-SoniaNeural`. The app also sets the voice when a call starts.
-3. Try it in the playground: "I'm calling about my broadband". The agent should call `record_call_reason`.
+3. Try it in the playground: "Hi, I'm calling for an update on my house purchase". The agent should call `record_call_reason`.
 
 ## 3. Create Cosmos DB (serverless)
 
@@ -76,6 +76,7 @@ az cosmosdb create -n $COSMOS -g $RG --locations regionName=$LOCATION --capabili
 az cosmosdb sql database create -a $COSMOS -g $RG -n voiceagent
 az cosmosdb sql container create -a $COSMOS -g $RG -d voiceagent -n calls --partition-key-path /id
 az cosmosdb sql container create -a $COSMOS -g $RG -d voiceagent -n customers --partition-key-path /id
+az cosmosdb sql container create -a $COSMOS -g $RG -d voiceagent -n agents --partition-key-path /id
 COSMOS_ENDPOINT=$(az cosmosdb show -n $COSMOS -g $RG --query documentEndpoint -o tsv)
 ```
 
@@ -145,14 +146,13 @@ az containerapp update -n $APP -g $RG --set-env-vars \
   Cosmos__Endpoint=$COSMOS_ENDPOINT \
   Acs__Endpoint=$ACS_ENDPOINT \
   Acs__PublicBaseUrl=https://$APP_FQDN \
-  Acs__CallbackToken=secretref:callback-token \
-  Acs__AgentTransferTarget=+447700900000
+  Acs__CallbackToken=secretref:callback-token
 ```
 
-- Set `Acs__AgentTransferTarget` to where taken calls should ring, for example your mobile (`+44…`), or a Teams user (`8:orgid:<user-object-id>`).
+- Each member of the team sets their own transfer target in the portal (**Set up agent**): their phone number (`+44…`) or Teams user (`8:orgid:<user-object-id>`). Calls they accept are transferred there.
 - Optional: `Acs__HoldMusicUrl=https://…/hold.wav` (a public WAV file).
 
-Open `https://$APP_FQDN`, go to **Test call**, and talk to the agent. Use the **Sample customers** page for the security answers.
+Open `https://$APP_FQDN`, go to **Test call**, and talk to the agent. Use the **Sample clients** page for the security answers.
 
 ## 8. Route incoming phone calls to the app (Event Grid)
 
@@ -197,10 +197,12 @@ From then on, every merge to `main` builds, tests and deploys. The deploy job is
 | --- | --- |
 | Test call goes straight to **Waiting for agent: Voice agent unavailable** | `VoiceLive__Endpoint` and `VoiceLive__ProjectName` are set, the role assignments from step 6 exist (wait 5 minutes after creating them), and the container logs show the Voice Live error. |
 | Voice Live rejects the connection (400/401/404) | The agent connection parameters have changed between API versions. Try a different `VoiceLive__ApiVersion` (for example `2026-06-01-preview` or `2025-10-01`), or `VoiceLive__AuthMode=Query`. |
-| The agent talks but the portal shows no reason, account or security progress | Tool calls aren't reaching the app. Set `VoiceLive__Mode=Model` (and `VoiceLive__Model=gpt-realtime` or another realtime deployment). The app then sends the same instructions and tools itself. |
+| The agent talks but the portal shows no reason, matter or security progress | Tool calls aren't reaching the app. Set `VoiceLive__Mode=Model` (and `VoiceLive__Model=gpt-realtime` or another realtime deployment). The app then sends the same instructions and tools itself. |
 | Phone rings but isn't answered | Check that the Event Grid subscription exists and that its delivery metrics show successes, that `Acs__PublicBaseUrl` is the https URL of the app, and that the token matches. |
-| **Take call** says transfer isn't configured | Set `Acs__AgentTransferTarget`. |
-| The agent mishears account numbers | Callers can say them digit by digit. The app normalises "one oh two three…" to `1023…`. |
+| Queued callers are never offered to anyone | At least one agent must be set to **Available** in the portal. Agents who miss an offer are set to Offline. |
+| **Take call** says telephony isn't configured | Set `Acs__Endpoint` and `Acs__PublicBaseUrl`. Browser test calls can still be taken without them. |
+| A transfer rings but fails | Check the agent's transfer target on the **Agents** page. Calling out to a phone number needs an ACS number that can make outbound calls. |
+| The agent mishears matter references | Callers can say them letter by letter and digit by digit. The app normalises "C V two oh four one" to `CV2041`. |
 
 ## Local development against Azure
 
