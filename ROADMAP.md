@@ -3,6 +3,7 @@
 ## Next
 - **Entra ID sign-in for the portal.** Protect the portal, API and SignalR hub with Microsoft Entra ID (MSAL in Blazor WebAssembly, JWT bearer on the API). Use the signed-in user's name for **Take call** instead of the name stored in the browser. Webhook and media endpoints stay on their own token or ACS JWT validation.
 - **Validate ACS webhook JWTs.** Check the Call Automation callback and media streaming JWTs as well as the shared `?token=`.
+- **Light mode.** Add a light/dark toggle to the portal's app bar, stick with dark by default, and remember the choice on each device (or follow the system setting).
 - **Real customer data.** Replace the sample dataset with a CRM or database connector behind `ICustomerRepository`, and turn off `Demo__ShowSampleData`.
 
 ## Later
