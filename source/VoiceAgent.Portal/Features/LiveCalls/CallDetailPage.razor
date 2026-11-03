@@ -1,0 +1,148 @@
+@page "/calls/{Id}"
+@implements IDisposable
+@inject ICallsApi Api
+@inject ILiveCalls LiveCalls
+
+<PageTitle>Call @(_summary?.CallerNumber)</PageTitle>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" />
+}
+else if (_summary is null)
+{
+    <MudAlert Severity="Severity.Warning">This call couldn't be found.</MudAlert>
+}
+else
+{
+    <MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4" Wrap="Wrap.Wrap">
+        <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" Href="" aria-label="Back to live calls" />
+        <MudText Typo="Typo.h5" id="h1">@_summary.CallerNumber</MudText>
+        <StageChip Stage="_summary.Stage" />
+        <MudSpacer />
+        @if (_summary.Stage != CallStage.Ended)
+        {
+            <TakeCallButton Call="_summary" Size="Size.Medium" />
+        }
+    </MudStack>
+
+    <MudGrid>
+        <MudItem xs="12" md="4">
+            <MudPaper Class="pa-4 mb-4" Elevation="1">
+                <MudText Typo="Typo.h6" Class="mb-2">Call</MudText>
+                <dl class="facts">
+                    <dt>Started</dt><dd>@_summary.StartedAt.ToLocalTime().ToString("dd MMM HH:mm:ss")</dd>
+                    <dt>Duration</dt><dd>@CallFormatting.Duration(_summary.StartedAt, _summary.EndedAt)</dd>
+                    <dt>Reason</dt><dd>@(_summary.CallReason ?? "Not known yet")</dd>
+                    <dt>Category</dt><dd>@(_summary.CallCategory ?? "–")</dd>
+                    <dt>Account</dt><dd>@(_summary.ClaimedAccount ?? "–")</dd>
+                    <dt>Case</dt><dd>@(_summary.CaseReference ?? "–")</dd>
+                    @if (_summary.QueueReason is not null)
+                    {
+                        <dt>Queued</dt><dd>@_summary.QueueReason</dd>
+                    }
+                    @if (_summary.AssignedAgent is not null)
+                    {
+                        <dt>Agent</dt><dd>@_summary.AssignedAgent</dd>
+                    }
+                </dl>
+            </MudPaper>
+
+            <MudPaper Class="pa-4 mb-4" Elevation="1">
+                <MudText Typo="Typo.h6" Class="mb-2">Security</MudText>
+                <MudText Color="@_summary.Verification.Colour()" data-testid="verification-status">@_summary.Verification.Label()</MudText>
+                <MudText Typo="Typo.body2" Class="mud-text-secondary">Failed attempts: @_summary.VerificationAttempts of 3</MudText>
+                @if (_summary.CustomerName is not null)
+                {
+                    <MudText Typo="Typo.body2" Class="mt-2">Verified as <b>@_summary.CustomerName</b></MudText>
+                }
+            </MudPaper>
+
+            <MudPaper Class="pa-4" Elevation="1">
+                <MudText Typo="Typo.h6" Class="mb-2">Timeline</MudText>
+                <MudTimeline TimelinePosition="TimelinePosition.Start">
+                    @foreach (var evt in _events.AsEnumerable().Reverse())
+                    {
+                        <MudTimelineItem Size="Size.Small">
+                            <MudText Typo="Typo.body2">@evt.Description</MudText>
+                            <MudText Typo="Typo.caption" Class="mud-text-secondary">@evt.Timestamp.ToLocalTime().ToString("HH:mm:ss")</MudText>
+                        </MudTimelineItem>
+                    }
+                </MudTimeline>
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="8">
+            <MudPaper Class="pa-2" Elevation="1">
+                <MudText Typo="Typo.h6" Class="pa-2">Transcript</MudText>
+                <TranscriptView Entries="_transcript" />
+            </MudPaper>
+        </MudItem>
+    </MudGrid>
+}
+
+@code {
+    private bool _loading = true;
+    private CallSummary? _summary;
+    private List<TranscriptEntry> _transcript = [];
+    private List<CallEvent> _events = [];
+    private Timer? _timer;
+
+    [Parameter] public string Id { get; set; } = string.Empty;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _loading = true;
+        LiveCalls.CallUpdated -= OnCallUpdated;
+        LiveCalls.TranscriptAdded -= OnTranscript;
+        LiveCalls.CallEventAdded -= OnEvent;
+
+        // Subscribe first so nothing said while loading is missed.
+        LiveCalls.CallUpdated += OnCallUpdated;
+        LiveCalls.TranscriptAdded += OnTranscript;
+        LiveCalls.CallEventAdded += OnEvent;
+
+        var detail = await Api.GetCallAsync(Id);
+        if (detail is not null)
+        {
+            _summary = detail.Summary;
+            _transcript = Merge(detail.Transcript, _transcript, e => (e.Timestamp, e.Text));
+            _events = Merge(detail.Events, _events, e => (e.Timestamp, e.Description));
+        }
+
+        _timer ??= new Timer(_ => InvokeAsync(StateHasChanged), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+        _loading = false;
+    }
+
+    private static List<T> Merge<T>(IEnumerable<T> loaded, IEnumerable<T> live, Func<T, (DateTimeOffset, string)> key) =>
+        loaded.Concat(live).DistinctBy(key).OrderBy(x => key(x).Item1).ToList();
+
+    private void OnCallUpdated(CallSummary summary)
+    {
+        if (summary.Id != Id) return;
+        _summary = summary;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnTranscript(TranscriptUpdate update)
+    {
+        if (update.CallId != Id) return;
+        _transcript.Add(update.Entry);
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnEvent(CallEventUpdate update)
+    {
+        if (update.CallId != Id) return;
+        _events.Add(update.Event);
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        LiveCalls.CallUpdated -= OnCallUpdated;
+        LiveCalls.TranscriptAdded -= OnTranscript;
+        LiveCalls.CallEventAdded -= OnEvent;
+        _timer?.Dispose();
+    }
+}

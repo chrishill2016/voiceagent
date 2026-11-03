@@ -1,0 +1,71 @@
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject ILiveCalls LiveCalls
+
+<MudThemeProvider Theme="_theme" IsDarkMode="true" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="1" Dense="true">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start" OnClick="() => _drawerOpen = !_drawerOpen" aria-label="Toggle navigation" />
+        <MudIcon Icon="@Icons.Material.Filled.HeadsetMic" Class="mr-2" />
+        <MudText Typo="Typo.h6">Customer Services Portal</MudText>
+        <MudSpacer />
+        @if (LiveCalls.Queue.Count > 0)
+        {
+            <MudBadge Content="@LiveCalls.Queue.Count" Color="Color.Error" Overlap="true" Class="mr-4 mt-2">
+                <MudIconButton Icon="@Icons.Material.Filled.HourglassTop" Color="Color.Inherit" Href="" aria-label="Callers waiting" />
+            </MudBadge>
+        }
+        <ConnectionIndicator />
+    </MudAppBar>
+
+    <MudDrawer @bind-Open="_drawerOpen" Elevation="1" ClipMode="DrawerClipMode.Always" Variant="DrawerVariant.Responsive">
+        <MudNavMenu>
+            <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Phone">Live calls</MudNavLink>
+            <MudNavLink Href="history" Icon="@Icons.Material.Filled.History">Call history</MudNavLink>
+            <MudNavLink Href="test-call" Icon="@Icons.Material.Filled.Mic">Test call</MudNavLink>
+            <MudNavLink Href="sample-data" Icon="@Icons.Material.Filled.Dataset">Sample customers</MudNavLink>
+        </MudNavMenu>
+    </MudDrawer>
+
+    <MudMainContent Class="d-flex flex-column" Style="min-height: 100vh;">
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="py-4 flex-grow-1">
+            @Body
+        </MudContainer>
+        <footer class="app-footer">
+            <MudText Typo="Typo.caption">Customer Services Portal · v@(AppVersion.Current)</MudText>
+        </footer>
+    </MudMainContent>
+</MudLayout>
+
+<UpdatePrompt />
+
+@code {
+    private bool _drawerOpen = true;
+
+    private readonly MudTheme _theme = new()
+    {
+        PaletteDark = new PaletteDark
+        {
+            Primary = "#4f8cff",
+            Secondary = "#26c6da",
+            Background = "#0f1320",
+            Surface = "#161b2c",
+            AppbarBackground = "#121726",
+            DrawerBackground = "#121726",
+        },
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        LiveCalls.Changed += OnChanged;
+        await LiveCalls.StartAsync();
+    }
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => LiveCalls.Changed -= OnChanged;
+}

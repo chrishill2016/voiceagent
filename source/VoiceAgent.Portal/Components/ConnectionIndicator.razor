@@ -1,0 +1,61 @@
+@implements IDisposable
+@inject ILiveCalls LiveCalls
+@inject ISnackbar Snackbar
+
+<MudTooltip Text="@Tooltip">
+    <MudChip T="string" Size="Size.Small" Color="@Colour" Icon="@Icon" Variant="Variant.Outlined" data-testid="connection-state">
+        @Label
+    </MudChip>
+</MudTooltip>
+
+@code {
+    private LiveConnectionState _previous = LiveConnectionState.Connecting;
+    private bool _wasDown;
+
+    private string Label => LiveCalls.State switch
+    {
+        LiveConnectionState.Connected => "Live",
+        LiveConnectionState.Reconnecting => "Reconnecting…",
+        LiveConnectionState.Disconnected => "Offline",
+        _ => "Connecting…",
+    };
+
+    private Color Colour => LiveCalls.State switch
+    {
+        LiveConnectionState.Connected => Color.Success,
+        LiveConnectionState.Reconnecting or LiveConnectionState.Connecting => Color.Warning,
+        _ => Color.Error,
+    };
+
+    private string Icon => LiveCalls.State == LiveConnectionState.Connected
+        ? Icons.Material.Filled.Wifi
+        : Icons.Material.Filled.WifiOff;
+
+    private string Tooltip => LiveCalls.LastUpdate is { } last
+        ? $"Last update {last.ToLocalTime():HH:mm:ss}"
+        : "Waiting for the first update";
+
+    protected override void OnInitialized() => LiveCalls.Changed += OnChanged;
+
+    private void OnChanged()
+    {
+        var state = LiveCalls.State;
+        if (state != _previous)
+        {
+            if (state is LiveConnectionState.Reconnecting or LiveConnectionState.Disconnected && !_wasDown)
+            {
+                _wasDown = true;
+                Snackbar.Add("Connection lost – live updates paused. Reconnecting…", Severity.Warning);
+            }
+            else if (state == LiveConnectionState.Connected && _wasDown)
+            {
+                _wasDown = false;
+                Snackbar.Add("Reconnected – live calls refreshed.", Severity.Success);
+            }
+            _previous = state;
+        }
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose() => LiveCalls.Changed -= OnChanged;
+}

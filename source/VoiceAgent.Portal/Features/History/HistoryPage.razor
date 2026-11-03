@@ -1,0 +1,74 @@
+@page "/history"
+@inject ICallsApi Api
+@inject NavigationManager Navigation
+
+<PageTitle>Call history</PageTitle>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h4" id="h1">Call history</MudText>
+    <MudSpacer />
+    <MudButton StartIcon="@Icons.Material.Filled.Refresh" OnClick="LoadAsync" Disabled="_loading">Refresh</MudButton>
+</MudStack>
+
+<MudTable Items="_calls" Loading="_loading" Hover="true" Dense="true" Elevation="1"
+          OnRowClick="@((TableRowClickEventArgs<CallSummary> e) => Navigation.NavigateTo($"calls/{e.Item!.Id}"))"
+          RowStyle="cursor: pointer;" Filter="Matches">
+    <ToolBarContent>
+        <MudSpacer />
+        <MudTextField @bind-Value="_search" Placeholder="Search caller, reason, case" Adornment="Adornment.Start"
+                      AdornmentIcon="@Icons.Material.Filled.Search" Immediate="true" Class="mt-0" />
+    </ToolBarContent>
+    <HeaderContent>
+        <MudTh>Started</MudTh>
+        <MudTh>Caller</MudTh>
+        <MudTh>Duration</MudTh>
+        <MudTh>Reason</MudTh>
+        <MudTh>Case</MudTh>
+        <MudTh>Security</MudTh>
+        <MudTh>Outcome</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Started">@context.StartedAt.ToLocalTime().ToString("dd MMM HH:mm")</MudTd>
+        <MudTd DataLabel="Caller">@context.CallerNumber</MudTd>
+        <MudTd DataLabel="Duration">@CallFormatting.Duration(context.StartedAt, context.EndedAt)</MudTd>
+        <MudTd DataLabel="Reason">@(context.CallReason ?? "–")</MudTd>
+        <MudTd DataLabel="Case">@(context.CaseReference ?? "–")</MudTd>
+        <MudTd DataLabel="Security"><MudText Typo="Typo.body2" Color="@context.Verification.Colour()">@context.Verification.Label()</MudText></MudTd>
+        <MudTd DataLabel="Outcome">@Outcome(context)</MudTd>
+    </RowTemplate>
+    <NoRecordsContent><MudText>No calls yet.</MudText></NoRecordsContent>
+</MudTable>
+
+@code {
+    private IReadOnlyList<CallSummary> _calls = [];
+    private bool _loading;
+    private string _search = string.Empty;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        try
+        {
+            _calls = await Api.GetRecentAsync(100);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private bool Matches(CallSummary call) =>
+        string.IsNullOrWhiteSpace(_search)
+        || new[] { call.CallerNumber, call.CallReason, call.CaseReference, call.CustomerName, call.ClaimedAccount }
+            .Any(v => v?.Contains(_search, StringComparison.OrdinalIgnoreCase) == true);
+
+    private static string Outcome(CallSummary call) => call switch
+    {
+        { EndedAt: null } => "In progress",
+        { AssignedAgent: not null } => $"Handled by {call.AssignedAgent}",
+        { QueueReason: not null } => "Hung up while queued",
+        _ => "Resolved by voice agent",
+    };
+}

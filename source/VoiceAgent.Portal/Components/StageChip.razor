@@ -1,0 +1,7 @@
+<MudChip T="string" Size="Size.Small" Color="@Stage.Colour()" Icon="@Stage.Icon()" Variant="Variant.Text" data-testid="stage-chip">
+    @Stage.Label()
+</MudChip>
+
+@code {
+    [Parameter, EditorRequired] public CallStage Stage { get; set; }
+}

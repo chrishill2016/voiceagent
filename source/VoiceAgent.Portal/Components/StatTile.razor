@@ -1,0 +1,14 @@
+<MudPaper Class="pa-4 d-flex align-center gap-3" Elevation="1" Style="@(Highlight ? "border-left: 4px solid var(--mud-palette-error);" : null)">
+    <MudIcon Icon="@Icon" Color="@(Highlight ? Color.Error : Color.Primary)" Size="Size.Large" />
+    <div>
+        <MudText Typo="Typo.h5" data-testid="stat-value">@Value</MudText>
+        <MudText Typo="Typo.caption" Class="mud-text-secondary">@Label</MudText>
+    </div>
+</MudPaper>
+
+@code {
+    [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public int Value { get; set; }
+    [Parameter] public string Icon { get; set; } = Icons.Material.Filled.Info;
+    [Parameter] public bool Highlight { get; set; }
+}

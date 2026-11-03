@@ -1,0 +1,51 @@
+@inject ICallsApi Api
+@inject AgentProfile Profile
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+
+<MudButton Variant="@(Call.Stage == CallStage.QueuedForAgent ? Variant.Filled : Variant.Outlined)"
+           Color="Color.Primary" Size="@Size" StartIcon="@Icons.Material.Filled.SupportAgent"
+           Disabled="@(_busy || Call.Stage is CallStage.WithAgent or CallStage.Ended)"
+           OnClick="TakeAsync" data-testid="take-call">
+    @(Call.Stage == CallStage.QueuedForAgent ? "Take call" : "Take over")
+</MudButton>
+
+@code {
+    private bool _busy;
+
+    [Parameter, EditorRequired] public CallSummary Call { get; set; } = default!;
+    [Parameter] public Size Size { get; set; } = Size.Small;
+
+    private async Task TakeAsync()
+    {
+        var name = await Profile.GetNameAsync();
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            name = await AskForNameAsync();
+            if (string.IsNullOrWhiteSpace(name)) return;
+            await Profile.SetNameAsync(name);
+        }
+
+        _busy = true;
+        try
+        {
+            var result = await Api.TakeCallAsync(Call.Id, name);
+            Snackbar.Add(result.Message, result.Success ? Severity.Success : Severity.Error);
+        }
+        catch (HttpRequestException)
+        {
+            Snackbar.Add("Couldn't reach the server. Try again.", Severity.Error);
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task<string?> AskForNameAsync()
+    {
+        var dialog = await Dialogs.ShowAsync<AgentNameDialog>("Who's taking the call?");
+        var result = await dialog.Result;
+        return result is { Canceled: false, Data: string name } ? name : null;
+    }
+}

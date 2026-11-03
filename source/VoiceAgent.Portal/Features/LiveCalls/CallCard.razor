@@ -1,0 +1,45 @@
+<MudCard Elevation="2" data-testid="call-card">
+    <MudCardHeader>
+        <CardHeaderContent>
+            <MudText Typo="Typo.subtitle1"><b>@Call.CallerNumber</b></MudText>
+            <MudText Typo="Typo.caption" Class="mud-text-secondary">
+                @CallFormatting.Duration(Call.StartedAt) @(Call.IsTestCall ? "· test call" : "")
+            </MudText>
+        </CardHeaderContent>
+        <CardHeaderActions>
+            <StageChip Stage="Call.Stage" />
+        </CardHeaderActions>
+    </MudCardHeader>
+    <MudCardContent Class="pt-0">
+        <dl class="facts">
+            <dt>Reason</dt><dd>@(Call.CallReason ?? "Not known yet")</dd>
+            <dt>Account</dt><dd>@(Call.ClaimedAccount ?? "–")</dd>
+            <dt>Case</dt><dd>@(Call.CaseReference ?? "–")</dd>
+            <dt>Security</dt>
+            <dd>
+                <MudText Typo="Typo.body2" Color="@Call.Verification.Colour()" Inline="true">@Call.Verification.Label()</MudText>
+                @if (Call.VerificationAttempts > 0 && Call.Verification != VerificationStatus.Passed)
+                {
+                    <MudText Typo="Typo.caption" Inline="true"> (@Call.VerificationAttempts failed)</MudText>
+                }
+            </dd>
+            @if (Call.CustomerName is not null)
+            {
+                <dt>Customer</dt><dd>@Call.CustomerName</dd>
+            }
+            @if (Call.AssignedAgent is not null)
+            {
+                <dt>Agent</dt><dd>@Call.AssignedAgent</dd>
+            }
+        </dl>
+    </MudCardContent>
+    <MudCardActions>
+        <MudButton Variant="Variant.Text" Href="@($"calls/{Call.Id}")" StartIcon="@Icons.Material.Filled.Subtitles">Live transcript</MudButton>
+        <MudSpacer />
+        <TakeCallButton Call="Call" />
+    </MudCardActions>
+</MudCard>
+
+@code {
+    [Parameter, EditorRequired] public CallSummary Call { get; set; } = default!;
+}

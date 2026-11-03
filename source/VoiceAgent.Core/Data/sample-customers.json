@@ -1,0 +1,133 @@
+[
+  {
+    "id": "cust-001",
+    "accountNumber": "10234567",
+    "firstName": "Amelia",
+    "lastName": "Hughes",
+    "phoneNumber": "+447700900101",
+    "dateOfBirth": "1985-03-14",
+    "postcode": "LS1 4AP",
+    "memorableWord": "lighthouse",
+    "cases": [
+      {
+        "reference": "CS1042",
+        "title": "Broadband speed lower than contracted",
+        "category": "Technical fault",
+        "status": "Engineer visit booked",
+        "openedOn": "2026-10-21",
+        "lastUpdatedOn": "2026-10-30",
+        "latestUpdate": "Line test showed a fault at the street cabinet.",
+        "nextStep": "Engineer visit on 6 November between 8am and 1pm."
+      }
+    ]
+  },
+  {
+    "id": "cust-002",
+    "accountNumber": "10987654",
+    "firstName": "Oliver",
+    "lastName": "Patel",
+    "phoneNumber": "+447700900102",
+    "dateOfBirth": "1972-11-02",
+    "postcode": "M4 2BS",
+    "memorableWord": "marmalade",
+    "cases": [
+      {
+        "reference": "CS1077",
+        "title": "Double charge on October bill",
+        "category": "Billing",
+        "status": "Refund approved",
+        "openedOn": "2026-10-25",
+        "lastUpdatedOn": "2026-11-01",
+        "latestUpdate": "Duplicate payment of £42.99 confirmed by the billing team.",
+        "nextStep": "Refund will reach the customer's card within 5 working days."
+      },
+      {
+        "reference": "CS0951",
+        "title": "Change of address",
+        "category": "Account change",
+        "status": "Closed",
+        "openedOn": "2026-08-12",
+        "lastUpdatedOn": "2026-08-13",
+        "latestUpdate": "Address updated.",
+        "nextStep": null
+      }
+    ]
+  },
+  {
+    "id": "cust-003",
+    "accountNumber": "11223344",
+    "firstName": "Sophie",
+    "lastName": "Williams",
+    "phoneNumber": "+447700900103",
+    "dateOfBirth": "1990-07-28",
+    "postcode": "CF10 1EP",
+    "memorableWord": "dragonfly",
+    "cases": [
+      {
+        "reference": "CS1101",
+        "title": "Router not delivered",
+        "category": "Delivery",
+        "status": "Replacement dispatched",
+        "openedOn": "2026-10-29",
+        "lastUpdatedOn": "2026-11-02",
+        "latestUpdate": "Courier reported the original parcel as lost.",
+        "nextStep": "Replacement router due on 4 November, tracking sent by text."
+      }
+    ]
+  },
+  {
+    "id": "cust-004",
+    "accountNumber": "12345678",
+    "firstName": "James",
+    "lastName": "O'Connor",
+    "phoneNumber": "+447700900104",
+    "dateOfBirth": "1968-01-09",
+    "postcode": "BT1 5GS",
+    "memorableWord": "harbour",
+    "cases": [
+      {
+        "reference": "CS1120",
+        "title": "Complaint about missed engineer appointment",
+        "category": "Complaint",
+        "status": "Under investigation",
+        "openedOn": "2026-11-01",
+        "lastUpdatedOn": "2026-11-02",
+        "latestUpdate": "Complaint passed to the field operations manager.",
+        "nextStep": "A manager will call back within 2 working days."
+      }
+    ]
+  },
+  {
+    "id": "cust-005",
+    "accountNumber": "13579246",
+    "firstName": "Priya",
+    "lastName": "Shah",
+    "phoneNumber": "+447700900105",
+    "dateOfBirth": "1995-05-17",
+    "postcode": "B1 1BB",
+    "memorableWord": "saffron",
+    "cases": [
+      {
+        "reference": "CS1088",
+        "title": "Upgrade to fibre package",
+        "category": "Sales",
+        "status": "Awaiting customer confirmation",
+        "openedOn": "2026-10-27",
+        "lastUpdatedOn": "2026-10-28",
+        "latestUpdate": "Quote sent for the 500Mb fibre package at £35 a month.",
+        "nextStep": "Customer needs to confirm the quote to book installation."
+      }
+    ]
+  },
+  {
+    "id": "cust-006",
+    "accountNumber": "14682579",
+    "firstName": "Thomas",
+    "lastName": "Reid",
+    "phoneNumber": "+447700900106",
+    "dateOfBirth": "1958-09-30",
+    "postcode": "EH1 1YZ",
+    "memorableWord": "thistle",
+    "cases": []
+  }
+]
