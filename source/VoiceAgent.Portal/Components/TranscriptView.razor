@@ -1,0 +1,53 @@
+@inject IJSRuntime JS
+
+<div class="transcript" id="@_id" data-testid="transcript">
+    @if (Entries.Count == 0)
+    {
+        <MudText Typo="Typo.body2" Class="mud-text-secondary pa-4">Waiting for the conversation to start…</MudText>
+    }
+    @foreach (var entry in Entries)
+    {
+        <div class="bubble-row @RowClass(entry.Speaker)">
+            <div class="bubble @BubbleClass(entry.Speaker)">
+                <div class="bubble-meta">@SpeakerName(entry.Speaker) · @entry.Timestamp.ToLocalTime().ToString("HH:mm:ss")</div>
+                <div>@entry.Text</div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private readonly string _id = $"transcript-{Guid.NewGuid():n}";
+    private int _renderedCount;
+
+    [Parameter, EditorRequired] public IReadOnlyList<TranscriptEntry> Entries { get; set; } = [];
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (Entries.Count == _renderedCount) return;
+        _renderedCount = Entries.Count;
+        try
+        {
+            await JS.InvokeVoidAsync("voiceAgent.scrollToBottom", _id);
+        }
+        catch (JSException)
+        {
+        }
+    }
+
+    private static string SpeakerName(Speaker speaker) => speaker switch
+    {
+        Speaker.Caller => "Caller",
+        Speaker.Agent => "Voice agent",
+        _ => "System",
+    };
+
+    private static string RowClass(Speaker speaker) => speaker == Speaker.Caller ? "left" : "right";
+
+    private static string BubbleClass(Speaker speaker) => speaker switch
+    {
+        Speaker.Caller => "caller",
+        Speaker.Agent => "agent",
+        _ => "system",
+    };
+}

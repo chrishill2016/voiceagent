@@ -1,0 +1,14 @@
+{
+  "name": "Customer Services Portal",
+  "short_name": "CS Portal",
+  "id": "./",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0f1320",
+  "theme_color": "#121726",
+  "prefer_related_applications": false,
+  "icons": [
+    { "src": "icon-512.png", "type": "image/png", "sizes": "512x512" },
+    { "src": "icon-192.png", "type": "image/png", "sizes": "192x192" }
+  ]
+}

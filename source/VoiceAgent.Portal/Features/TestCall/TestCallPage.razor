@@ -1,0 +1,127 @@
+@page "/test-call"
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject ILiveCalls LiveCalls
+@inject NavigationManager Navigation
+
+<PageTitle>Test call</PageTitle>
+
+<MudText Typo="Typo.h4" id="h1" Class="mb-2">Test call</MudText>
+<MudText Typo="Typo.body2" Class="mud-text-secondary mb-4">
+    Talk to the voice agent from your browser using your microphone. It goes through exactly the same
+    pipeline as a phone call, so you can test before buying a phone number. Use headphones to avoid echo.
+    Need some security answers? See the <MudLink Href="sample-data">sample customers</MudLink>.
+</MudText>
+
+<MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center" Class="mb-4">
+    @if (_callId is null)
+    {
+        <MudButton Variant="Variant.Filled" Color="Color.Success" StartIcon="@Icons.Material.Filled.Call" OnClick="StartAsync" Disabled="_starting">
+            @(_starting ? "Connecting…" : "Start test call")
+        </MudButton>
+    }
+    else
+    {
+        <MudButton Variant="Variant.Filled" Color="Color.Error" StartIcon="@Icons.Material.Filled.CallEnd" OnClick="StopAsync">End call</MudButton>
+        <StageChip Stage="_stage" />
+        <MudButton Variant="Variant.Text" Href="@($"calls/{_callId}")">Open in call view</MudButton>
+    }
+</MudStack>
+
+@if (_error is not null)
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@_error</MudAlert>
+}
+
+<MudPaper Class="pa-2" Elevation="1">
+    <TranscriptView Entries="_transcript" />
+</MudPaper>
+
+@code {
+    private DotNetObjectReference<TestCallPage>? _ref;
+    private string? _callId;
+    private bool _starting;
+    private string? _error;
+    private CallStage _stage = CallStage.Connecting;
+    private readonly List<TranscriptEntry> _transcript = [];
+
+    protected override void OnInitialized()
+    {
+        LiveCalls.TranscriptAdded += OnTranscript;
+        LiveCalls.CallUpdated += OnCallUpdated;
+    }
+
+    private async Task StartAsync()
+    {
+        _error = null;
+        _starting = true;
+        _transcript.Clear();
+        _ref ??= DotNetObjectReference.Create(this);
+
+        var wsUrl = Navigation.ToAbsoluteUri("ws/test-call").ToString()
+            .Replace("https://", "wss://").Replace("http://", "ws://");
+        try
+        {
+            await JS.InvokeVoidAsync("voiceAgent.testCall.start", _ref, wsUrl);
+        }
+        catch (JSException ex)
+        {
+            _error = $"Couldn't start the call: {ex.Message}";
+            _starting = false;
+        }
+    }
+
+    private async Task StopAsync()
+    {
+        await JS.InvokeVoidAsync("voiceAgent.testCall.stop");
+    }
+
+    [JSInvokable]
+    public void OnCallStarted(string callId)
+    {
+        _callId = callId;
+        _starting = false;
+        _stage = CallStage.Connecting;
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public void OnCallEnded(string? error)
+    {
+        _callId = null;
+        _starting = false;
+        _error = error;
+        StateHasChanged();
+    }
+
+    private void OnTranscript(TranscriptUpdate update)
+    {
+        if (update.CallId != _callId) return;
+        _transcript.Add(update.Entry);
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnCallUpdated(CallSummary summary)
+    {
+        if (summary.Id != _callId) return;
+        _stage = summary.Stage;
+        InvokeAsync(StateHasChanged);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        LiveCalls.TranscriptAdded -= OnTranscript;
+        LiveCalls.CallUpdated -= OnCallUpdated;
+        try
+        {
+            await JS.InvokeVoidAsync("voiceAgent.testCall.stop");
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        catch (JSException)
+        {
+        }
+        _ref?.Dispose();
+    }
+}

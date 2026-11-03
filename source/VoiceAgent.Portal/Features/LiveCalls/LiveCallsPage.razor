@@ -1,0 +1,92 @@
+@page "/"
+@implements IDisposable
+@inject ILiveCalls LiveCalls
+
+<PageTitle>Live calls</PageTitle>
+
+<MudStack Row="true" AlignItems="AlignItems.Center" Class="mb-4">
+    <MudText Typo="Typo.h4" id="h1">Live calls</MudText>
+</MudStack>
+
+<MudGrid Class="mb-2">
+    <MudItem xs="6" md="3"><StatTile Label="Active calls" Value="@Calls.Count" Icon="@Icons.Material.Filled.Phone" /></MudItem>
+    <MudItem xs="6" md="3"><StatTile Label="Waiting for agent" Value="@Queue.Count" Icon="@Icons.Material.Filled.HourglassTop" Highlight="@(Queue.Count > 0)" /></MudItem>
+    <MudItem xs="6" md="3"><StatTile Label="In security check" Value="@Calls.Count(c => c.Stage == CallStage.Verifying)" Icon="@Icons.Material.Filled.Shield" /></MudItem>
+    <MudItem xs="6" md="3"><StatTile Label="Verified" Value="@Calls.Count(c => c.Verification == VerificationStatus.Passed)" Icon="@Icons.Material.Filled.VerifiedUser" /></MudItem>
+</MudGrid>
+
+<MudText Typo="Typo.h6" Class="mt-4 mb-2">Agent queue</MudText>
+@if (Queue.Count == 0)
+{
+    <MudPaper Class="pa-4 mb-4" Outlined="true">
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">No callers waiting. The voice agent queues callers here when they ask for a person, fail security, or need something it can't do.</MudText>
+    </MudPaper>
+}
+else
+{
+    <MudTable Items="Queue" Dense="true" Hover="true" Class="mb-4" Elevation="1" data-testid="queue-table">
+        <HeaderContent>
+            <MudTh>Waiting</MudTh>
+            <MudTh>Caller</MudTh>
+            <MudTh>Reason for queue</MudTh>
+            <MudTh>Call reason</MudTh>
+            <MudTh>Security</MudTh>
+            <MudTh></MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="Waiting">@CallFormatting.Duration(context.QueuedAt ?? context.StartedAt)</MudTd>
+            <MudTd DataLabel="Caller">@context.CallerNumber</MudTd>
+            <MudTd DataLabel="Reason for queue">@context.QueueReason</MudTd>
+            <MudTd DataLabel="Call reason">@(context.CallReason ?? "–")</MudTd>
+            <MudTd DataLabel="Security"><MudText Typo="Typo.body2" Color="@context.Verification.Colour()">@context.Verification.Label()</MudText></MudTd>
+            <MudTd>
+                <MudStack Row="true" Spacing="1" Justify="Justify.FlexEnd">
+                    <MudButton Variant="Variant.Text" Size="Size.Small" Href="@($"calls/{context.Id}")">Transcript</MudButton>
+                    <TakeCallButton Call="context" />
+                </MudStack>
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+}
+
+<MudText Typo="Typo.h6" Class="mt-4 mb-2">With the voice agent</MudText>
+@if (WithAi.Count == 0)
+{
+    <MudPaper Class="pa-4" Outlined="true">
+        <MudText Typo="Typo.body2" Class="mud-text-secondary">No calls in progress. Try a <MudLink Href="test-call">test call</MudLink> from your browser.</MudText>
+    </MudPaper>
+}
+else
+{
+    <MudGrid>
+        @foreach (var call in WithAi)
+        {
+            <MudItem xs="12" sm="6" lg="4" @key="call.Id">
+                <CallCard Call="call" />
+            </MudItem>
+        }
+    </MudGrid>
+}
+
+@code {
+    private Timer? _timer;
+
+    private IReadOnlyList<CallSummary> Calls => LiveCalls.ActiveCalls;
+    private IReadOnlyList<CallSummary> Queue => LiveCalls.Queue;
+    private IReadOnlyList<CallSummary> WithAi => Calls.Where(c => c.Stage != CallStage.QueuedForAgent).ToList();
+
+    protected override void OnInitialized()
+    {
+        LiveCalls.Changed += OnChanged;
+        // Re-render every second so call durations tick.
+        _timer = new Timer(_ => OnChanged(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+    }
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        LiveCalls.Changed -= OnChanged;
+        _timer?.Dispose();
+    }
+}

@@ -1,0 +1,46 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+@if (_updateAvailable)
+{
+    <div class="update-prompt">
+        <MudAlert Severity="Severity.Info" Variant="Variant.Filled" Elevation="4" Icon="@Icons.Material.Filled.SystemUpdate">
+            New version available –
+            <MudButton Variant="Variant.Text" Color="Color.Inherit" OnClick="RefreshAsync" Class="ml-1">Refresh</MudButton>
+        </MudAlert>
+    </div>
+}
+
+@code {
+    private bool _updateAvailable;
+    private DotNetObjectReference<UpdatePrompt>? _ref;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        _ref = DotNetObjectReference.Create(this);
+        try
+        {
+            await JS.InvokeVoidAsync("voiceAgent.registerUpdateNotifier", _ref);
+        }
+        catch (JSException)
+        {
+            // Service worker unsupported (e.g. dev server over http); nothing to do.
+        }
+    }
+
+    [JSInvokable]
+    public void OnUpdateAvailable()
+    {
+        _updateAvailable = true;
+        StateHasChanged();
+    }
+
+    private async Task RefreshAsync() => await JS.InvokeVoidAsync("voiceAgent.applyUpdate");
+
+    public ValueTask DisposeAsync()
+    {
+        _ref?.Dispose();
+        return ValueTask.CompletedTask;
+    }
+}

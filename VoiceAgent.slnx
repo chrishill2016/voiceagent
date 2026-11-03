@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/source/">
+    <Project Path="source/VoiceAgent.Api/VoiceAgent.Api.csproj" />
+    <Project Path="source/VoiceAgent.Core/VoiceAgent.Core.csproj" />
+    <Project Path="source/VoiceAgent.Portal/VoiceAgent.Portal.csproj" />
+    <Project Path="source/VoiceAgent.Provisioning/VoiceAgent.Provisioning.csproj" />
+    <Project Path="source/VoiceAgent.Shared/VoiceAgent.Shared.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/VoiceAgent.Tests/VoiceAgent.Tests.csproj" />
+  </Folder>
+</Solution>

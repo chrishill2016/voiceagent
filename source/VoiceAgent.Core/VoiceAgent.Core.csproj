@@ -1,0 +1,14 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\VoiceAgent.Shared\VoiceAgent.Shared.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Data\sample-customers.json" LogicalName="VoiceAgent.Core.Data.sample-customers.json" />
+  </ItemGroup>
+
+</Project>
