@@ -56,6 +56,25 @@ public static class CallFormatting
         _ => Color.Default,
     };
 
+    public static string Label(this AgentStatus status) => status switch
+    {
+        AgentStatus.Available => "Available",
+        AgentStatus.Busy => "Busy",
+        AgentStatus.WrapUp => "Wrap-up",
+        _ => "Offline",
+    };
+
+    public static Color Colour(this AgentStatus status) => status switch
+    {
+        AgentStatus.Available => Color.Success,
+        AgentStatus.Busy => Color.Error,
+        AgentStatus.WrapUp => Color.Warning,
+        _ => Color.Default,
+    };
+
+    public static string SecondsLeft(DateTimeOffset? until) =>
+        until is null ? string.Empty : $"{Math.Max(0, (int)Math.Ceiling((until.Value - DateTimeOffset.UtcNow).TotalSeconds))}s";
+
     public static string Duration(DateTimeOffset start, DateTimeOffset? end = null)
     {
         var span = (end ?? DateTimeOffset.UtcNow) - start;

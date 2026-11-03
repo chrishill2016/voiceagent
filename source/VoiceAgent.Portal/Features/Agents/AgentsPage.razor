@@ -1,0 +1,71 @@
+@page "/agents"
+@implements IDisposable
+@inject ILiveCalls LiveCalls
+
+<PageTitle>Agents</PageTitle>
+
+<MudText Typo="Typo.h4" id="h1" Class="mb-2">Agents</MudText>
+<MudText Typo="Typo.body2" Class="mud-text-secondary mb-4">
+    Waiting callers are offered to available agents, longest-idle first. An agent has a short time (20 seconds by default) to accept before the call moves on
+    and they're set to Offline. Each agent's calls are transferred to their own number or Teams ID.
+</MudText>
+
+<MudGrid Class="mb-2">
+    <MudItem xs="6" md="3"><StatTile Label="Available" Value="@Count(AgentStatus.Available)" Icon="@Icons.Material.Filled.CheckCircle" /></MudItem>
+    <MudItem xs="6" md="3"><StatTile Label="Busy" Value="@Count(AgentStatus.Busy)" Icon="@Icons.Material.Filled.Phone" /></MudItem>
+    <MudItem xs="6" md="3"><StatTile Label="Wrap-up" Value="@Count(AgentStatus.WrapUp)" Icon="@Icons.Material.Filled.EditNote" /></MudItem>
+    <MudItem xs="6" md="3"><StatTile Label="Callers waiting" Value="@LiveCalls.Queue.Count" Icon="@Icons.Material.Filled.HourglassTop" Highlight="@(LiveCalls.Queue.Count > 0)" /></MudItem>
+</MudGrid>
+
+<MudTable Items="LiveCalls.Agents" Dense="true" Hover="true" Elevation="1" data-testid="agents-table">
+    <HeaderContent>
+        <MudTh>Agent</MudTh>
+        <MudTh>Status</MudTh>
+        <MudTh>For</MudTh>
+        <MudTh>Transfers to</MudTh>
+        <MudTh>Call</MudTh>
+    </HeaderContent>
+    <RowTemplate>
+        <MudTd DataLabel="Agent">@context.Name</MudTd>
+        <MudTd DataLabel="Status"><MudChip T="string" Size="Size.Small" Color="@context.Status.Colour()">@context.Status.Label()</MudChip></MudTd>
+        <MudTd DataLabel="For">@CallFormatting.Duration(context.StatusSince)</MudTd>
+        <MudTd DataLabel="Transfers to">@context.TransferTarget</MudTd>
+        <MudTd DataLabel="Call">
+            @if (OfferFor(context) is { } offered)
+            {
+                <MudText Typo="Typo.body2" Color="Color.Warning">Offered: @offered.CallerNumber (@CallFormatting.SecondsLeft(offered.OfferExpiresAt))</MudText>
+            }
+            else if (context.CurrentCallId is { } callId)
+            {
+                <MudLink Href="@($"calls/{callId}")">View call</MudLink>
+            }
+            else
+            {
+                <span>–</span>
+            }
+        </MudTd>
+    </RowTemplate>
+    <NoRecordsContent><MudText>No agents yet. Use <b>Set up agent</b> in the top bar.</MudText></NoRecordsContent>
+</MudTable>
+
+@code {
+    private Timer? _timer;
+
+    private int Count(AgentStatus status) => LiveCalls.Agents.Count(a => a.Status == status);
+
+    private CallSummary? OfferFor(AgentInfo agent) => LiveCalls.Queue.FirstOrDefault(c => c.OfferedToAgentId == agent.Id);
+
+    protected override void OnInitialized()
+    {
+        LiveCalls.Changed += OnChanged;
+        _timer = new Timer(_ => OnChanged(), null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+    }
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        LiveCalls.Changed -= OnChanged;
+        _timer?.Dispose();
+    }
+}

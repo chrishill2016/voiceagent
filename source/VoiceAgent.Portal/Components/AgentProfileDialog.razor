@@ -1,0 +1,100 @@
+@inject ICallsApi Api
+@inject ILiveCalls LiveCalls
+
+<MudDialog>
+    <DialogContent>
+        @if (Existing is null && LiveCalls.Agents.Count > 0)
+        {
+            <MudSelect T="string" Label="I'm…" Value="_pickedId" ValueChanged="Pick" Clearable="true" Class="mb-4" data-testid="pick-agent">
+                @foreach (var agent in LiveCalls.Agents)
+                {
+                    <MudSelectItem Value="@agent.Id">@agent.Name</MudSelectItem>
+                }
+            </MudSelect>
+            <MudText Typo="Typo.caption" Class="mud-text-secondary">…or set up a new agent:</MudText>
+        }
+
+        @if (_pickedId is null)
+        {
+            <MudTextField @bind-Value="_name" Label="Your name" Immediate="true" Class="mb-2" data-testid="agent-name" />
+            <MudTextField @bind-Value="_target" Label="Transfer calls to" Immediate="true" data-testid="agent-target"
+                          HelperText="Your phone number (+44 7700 900123) or Teams ID (8:orgid:…). Calls you take are transferred here." />
+        }
+
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mt-3">@_error</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => Dialog.Cancel()">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" Disabled="@(!CanSave || _saving)" OnClick="SaveAsync" data-testid="save-agent">
+            @(_pickedId is not null ? "Continue" : Existing is null ? "Create profile" : "Save")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private string _name = string.Empty;
+    private string _target = string.Empty;
+    private string? _pickedId;
+    private string? _error;
+    private bool _saving;
+
+    [CascadingParameter] private IMudDialogInstance Dialog { get; set; } = default!;
+
+    /// <summary>When set, the dialog edits this agent's profile.</summary>
+    [Parameter] public AgentInfo? Existing { get; set; }
+
+    private bool CanSave => _pickedId is not null || (!string.IsNullOrWhiteSpace(_name) && !string.IsNullOrWhiteSpace(_target));
+
+    protected override void OnParametersSet()
+    {
+        if (Existing is null) return;
+        _name = Existing.Name;
+        _target = Existing.TransferTarget;
+    }
+
+    private void Pick(string? id)
+    {
+        _pickedId = id;
+        _error = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_pickedId is not null && LiveCalls.Agents.FirstOrDefault(a => a.Id == _pickedId) is { } picked)
+        {
+            Dialog.Close(DialogResult.Ok(picked));
+            return;
+        }
+
+        _saving = true;
+        _error = null;
+        try
+        {
+            var request = new SaveAgentRequest(_name, _target);
+            var result = Existing is null
+                ? await Api.CreateAgentAsync(request)
+                : await Api.UpdateAgentAsync(Existing.Id, request);
+
+            if (result is { Success: true, Agent: { } agent })
+            {
+                LiveCalls.ApplyAgent(agent);
+                Dialog.Close(DialogResult.Ok(agent));
+            }
+            else
+            {
+                _error = result.Message;
+            }
+        }
+        catch (HttpRequestException)
+        {
+            _error = "Couldn't reach the server. Try again.";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+}

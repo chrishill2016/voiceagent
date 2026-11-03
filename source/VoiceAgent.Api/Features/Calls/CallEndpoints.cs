@@ -21,9 +21,12 @@ public static class CallEndpoints
 
         api.MapPost("/calls/{id}/take", async (string id, TakeCallRequest request, AgentQueue queue, CancellationToken ct) =>
         {
-            var result = await queue.TakeAsync(id, request.AgentName, ct);
+            var result = await queue.TakeAsync(id, request.AgentId, ct);
             return result.Success ? Results.Ok(result) : Results.Conflict(result);
         });
+
+        api.MapPost("/calls/{id}/decline", async (string id, DeclineCallRequest request, AgentQueue queue) =>
+            Results.Ok(await queue.DeclineAsync(id, request.AgentId)));
 
         api.MapGet("/demo/customers", async (ICustomerRepository customers, IOptions<DemoOptions> demo, CancellationToken ct) =>
         {

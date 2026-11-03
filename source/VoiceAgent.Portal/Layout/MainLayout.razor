@@ -19,12 +19,14 @@
                 <MudIconButton Icon="@Icons.Material.Filled.HourglassTop" Color="Color.Inherit" Href="" aria-label="Callers waiting" />
             </MudBadge>
         }
+        <AgentStatusMenu />
         <ConnectionIndicator />
     </MudAppBar>
 
     <MudDrawer @bind-Open="_drawerOpen" Elevation="1" ClipMode="DrawerClipMode.Always" Variant="DrawerVariant.Responsive">
         <MudNavMenu>
             <MudNavLink Href="" Match="NavLinkMatch.All" Icon="@Icons.Material.Filled.Phone">Live calls</MudNavLink>
+            <MudNavLink Href="agents" Icon="@Icons.Material.Filled.SupportAgent">Agents</MudNavLink>
             <MudNavLink Href="history" Icon="@Icons.Material.Filled.History">Call history</MudNavLink>
             <MudNavLink Href="test-call" Icon="@Icons.Material.Filled.Mic">Test call</MudNavLink>
             <MudNavLink Href="sample-data" Icon="@Icons.Material.Filled.Dataset">Sample clients</MudNavLink>
@@ -41,6 +43,7 @@
     </MudMainContent>
 </MudLayout>
 
+<CallOfferBanner />
 <UpdatePrompt />
 
 @code {

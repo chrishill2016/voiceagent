@@ -16,12 +16,6 @@ public sealed class AcsOptions
     /// </summary>
     public string? CallbackToken { get; set; }
 
-    /// <summary>
-    /// Where queued calls are transferred when a portal user takes the call: an E.164 phone number (+44...),
-    /// an ACS user id (8:acs:...) or a Teams user id (8:orgid:...).
-    /// </summary>
-    public string? AgentTransferTarget { get; set; }
-
     /// <summary>Optional public URL of a WAV file played to callers while they wait in the agent queue.</summary>
     public string? HoldMusicUrl { get; set; }
 }
@@ -35,6 +29,18 @@ public sealed class CosmosOptions
     public string Database { get; set; } = "voiceagent";
     public string CallsContainer { get; set; } = "calls";
     public string CustomersContainer { get; set; } = "customers";
+    public string AgentsContainer { get; set; } = "agents";
+}
+
+public sealed class QueueOptions
+{
+    public const string Section = "Queue";
+
+    /// <summary>How long an available agent has to accept an offered call before it moves to the next agent.</summary>
+    public int OfferTimeoutSeconds { get; set; } = 20;
+
+    /// <summary>After declining (or missing) a call, an agent isn't offered that same call again for this long.</summary>
+    public int DeclineCooldownSeconds { get; set; } = 60;
 }
 
 public sealed class DemoOptions

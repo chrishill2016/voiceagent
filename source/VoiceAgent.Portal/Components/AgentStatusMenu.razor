@@ -1,0 +1,87 @@
+@implements IDisposable
+@inject AgentProfile Profile
+@inject ILiveCalls LiveCalls
+@inject ICallsApi Api
+@inject IDialogService Dialogs
+@inject ISnackbar Snackbar
+
+@if (Profile.Current is { } me)
+{
+    <MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight" Class="mr-3 agent-menu"
+             Label="@($"{me.Name} · {me.Status.Label()}")" Color="@me.Status.Colour()" Variant="Variant.Filled" Size="Size.Small"
+             StartIcon="@Icons.Material.Filled.SupportAgent" EndIcon="@Icons.Material.Filled.ArrowDropDown"
+             data-testid="agent-status">
+        <ChildContent>
+            @foreach (var status in Statuses)
+            {
+                <MudMenuItem OnClick="() => SetStatusAsync(status)" Icon="@(status == me.Status ? Icons.Material.Filled.Check : null)">
+                    @status.Label()
+                </MudMenuItem>
+            }
+            <MudDivider />
+            <MudMenuItem OnClick="EditAsync" Icon="@Icons.Material.Filled.Edit">Edit profile</MudMenuItem>
+            <MudMenuItem OnClick="SwitchAsync" Icon="@Icons.Material.Filled.SwitchAccount">Switch agent</MudMenuItem>
+        </ChildContent>
+    </MudMenu>
+}
+else
+{
+    <MudButton Variant="Variant.Outlined" Color="Color.Inherit" Size="Size.Small" Class="mr-3"
+               StartIcon="@Icons.Material.Filled.SupportAgent" OnClick="SetUpAsync" data-testid="agent-setup">
+        Set up agent
+    </MudButton>
+}
+
+@code {
+    private static readonly AgentStatus[] Statuses = [AgentStatus.Available, AgentStatus.Busy, AgentStatus.WrapUp, AgentStatus.Offline];
+
+    protected override async Task OnInitializedAsync()
+    {
+        Profile.Changed += OnChanged;
+        LiveCalls.Changed += OnChanged;
+        await Profile.LoadAsync();
+    }
+
+    private async Task SetStatusAsync(AgentStatus status)
+    {
+        if (Profile.Current is not { } me) return;
+        try
+        {
+            var result = await Api.SetAgentStatusAsync(me.Id, status);
+            if (result.Agent is { } agent) LiveCalls.ApplyAgent(agent);
+            if (!result.Success) Snackbar.Add(result.Message, Severity.Error);
+        }
+        catch (HttpRequestException)
+        {
+            Snackbar.Add("Couldn't reach the server. Try again.", Severity.Error);
+        }
+    }
+
+    private Task SetUpAsync() => OpenAsync(null);
+
+    private Task EditAsync() => OpenAsync(Profile.Current);
+
+    private async Task SwitchAsync()
+    {
+        if (Profile.Current is { Status: not AgentStatus.Offline } me)
+            await SetStatusAsync(AgentStatus.Offline);
+        await Profile.SetAsync(null);
+        await OpenAsync(null);
+    }
+
+    private async Task OpenAsync(AgentInfo? existing)
+    {
+        var parameters = new DialogParameters<AgentProfileDialog> { { d => d.Existing, existing } };
+        var dialog = await Dialogs.ShowAsync<AgentProfileDialog>(existing is null ? "Who are you?" : "Edit profile", parameters);
+        if (await dialog.Result is { Canceled: false, Data: AgentInfo agent })
+            await Profile.SetAsync(agent.Id);
+    }
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        Profile.Changed -= OnChanged;
+        LiveCalls.Changed -= OnChanged;
+    }
+}

@@ -13,6 +13,7 @@ public sealed class CallSession(CallSummary summary)
     private readonly List<TranscriptEntry> _transcript = [];
     private readonly List<CallEvent> _events = [];
     private readonly CancellationTokenSource _aiStop = new();
+    private readonly Dictionary<string, DateTimeOffset> _declinedBy = [];
     private CallSummary _summary = summary;
 
     public string Id => _summary.Id;
@@ -90,6 +91,17 @@ public sealed class CallSession(CallSummary summary)
     public void RequestHandOff()
     {
         lock (_gate) HandOffPending = true;
+    }
+
+    /// <summary>Remembers that an agent declined or missed this call, so it moves on to someone else.</summary>
+    public void RecordDecline(string agentId, DateTimeOffset at)
+    {
+        lock (_gate) _declinedBy[agentId] = at;
+    }
+
+    public bool RecentlyDeclinedBy(string agentId, DateTimeOffset now, TimeSpan cooldown)
+    {
+        lock (_gate) return _declinedBy.TryGetValue(agentId, out var at) && now - at < cooldown;
     }
 
     public void StopAi()

@@ -102,6 +102,7 @@ public static class TelephonyEndpoints
         HttpContext context,
         IOptions<AcsOptions> options,
         CallTracker tracker,
+        AgentQueue queue,
         ILogger<CallTracker> logger)
     {
         if (!CallbackToken.IsValid(context, options.Value)) return Results.Unauthorized();
@@ -131,8 +132,7 @@ public static class TelephonyEndpoints
                     break;
 
                 case CallTransferFailed failed:
-                    await tracker.AddEventAsync(session, $"Transfer failed: {failed.ResultInformation?.Message}");
-                    await tracker.UpdateAsync(session, s => s with { Stage = CallStage.QueuedForAgent, AssignedAgent = null });
+                    await queue.TransferFailedAsync(session, failed.ResultInformation?.Message);
                     break;
 
                 case CallDisconnected:

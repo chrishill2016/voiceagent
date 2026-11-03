@@ -31,6 +31,7 @@ else
             <MudTh>Reason for queue</MudTh>
             <MudTh>Call reason</MudTh>
             <MudTh>Security</MudTh>
+            <MudTh>Offered to</MudTh>
             <MudTh></MudTh>
         </HeaderContent>
         <RowTemplate>
@@ -39,6 +40,20 @@ else
             <MudTd DataLabel="Reason for queue">@context.QueueReason</MudTd>
             <MudTd DataLabel="Call reason">@(context.CallReason ?? "–")</MudTd>
             <MudTd DataLabel="Security"><MudText Typo="Typo.body2" Color="@context.Verification.Colour()">@context.Verification.Label()</MudText></MudTd>
+            <MudTd DataLabel="Offered to">
+                @if (context.OfferedToAgentName is not null)
+                {
+                    <span>@context.OfferedToAgentName (@CallFormatting.SecondsLeft(context.OfferExpiresAt))</span>
+                }
+                else if (LiveCalls.Agents.Any(a => a.Status == AgentStatus.Available))
+                {
+                    <span>Finding an agent…</span>
+                }
+                else
+                {
+                    <MudText Typo="Typo.body2" Color="Color.Warning">No agents available</MudText>
+                }
+            </MudTd>
             <MudTd>
                 <MudStack Row="true" Spacing="1" Justify="Justify.FlexEnd">
                     <MudButton Variant="Variant.Text" Size="Size.Small" Href="@($"calls/{context.Id}")">Transcript</MudButton>

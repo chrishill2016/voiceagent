@@ -1,42 +1,51 @@
 using Microsoft.JSInterop;
+using VoiceAgent.Shared;
 
 namespace VoiceAgent.Portal.Services;
 
 /// <summary>
-/// The portal user's display name, remembered in this browser. Placeholder until Entra ID sign-in is added.
+/// Which agent is using this browser, remembered on this device. Placeholder until Entra ID sign-in is added.
 /// </summary>
-public sealed class AgentProfile(IJSRuntime js)
+public sealed class AgentProfile(IJSRuntime js, ILiveCalls live)
 {
-    private const string Key = "voiceagent.agentName";
+    private const string Key = "voiceagent.agentId";
     private bool _loaded;
 
-    public string Name { get; private set; } = string.Empty;
+    public string? AgentId { get; private set; }
 
-    public async Task<string> GetNameAsync()
+    /// <summary>The signed-in agent's live record, or null if not set up (or not loaded yet).</summary>
+    public AgentInfo? Current => AgentId is null ? null : live.Agents.FirstOrDefault(a => a.Id == AgentId);
+
+    public event Action? Changed;
+
+    public async Task<string?> LoadAsync()
     {
-        if (_loaded) return Name;
+        if (_loaded) return AgentId;
         try
         {
-            Name = await js.InvokeAsync<string?>("localStorage.getItem", Key) ?? string.Empty;
+            AgentId = await js.InvokeAsync<string?>("localStorage.getItem", Key);
         }
         catch (JSException)
         {
-            // Storage blocked (private mode etc.); fall back to asking each time.
+            // Storage blocked (private mode etc.); the agent picks their profile each visit.
         }
         _loaded = true;
-        return Name;
+        Changed?.Invoke();
+        return AgentId;
     }
 
-    public async Task SetNameAsync(string name)
+    public async Task SetAsync(string? agentId)
     {
-        Name = name.Trim();
+        AgentId = agentId;
         _loaded = true;
         try
         {
-            await js.InvokeVoidAsync("localStorage.setItem", Key, Name);
+            if (agentId is null) await js.InvokeVoidAsync("localStorage.removeItem", Key);
+            else await js.InvokeVoidAsync("localStorage.setItem", Key, agentId);
         }
         catch (JSException)
         {
         }
+        Changed?.Invoke();
     }
 }

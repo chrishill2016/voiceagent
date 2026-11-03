@@ -59,6 +59,12 @@ public sealed record CallSummary
     public string? QueueReason { get; init; }
     public DateTimeOffset? QueuedAt { get; init; }
     public string? AssignedAgent { get; init; }
+    public string? AssignedAgentId { get; init; }
+
+    /// <summary>The available agent this queued call is currently being offered to.</summary>
+    public string? OfferedToAgentId { get; init; }
+    public string? OfferedToAgentName { get; init; }
+    public DateTimeOffset? OfferExpiresAt { get; init; }
 
     public DateTimeOffset LastModified { get; init; }
 }
@@ -69,7 +75,7 @@ public sealed record TranscriptUpdate(string CallId, TranscriptEntry Entry);
 
 public sealed record CallEventUpdate(string CallId, CallEvent Event);
 
-public sealed record TakeCallRequest(string AgentName);
+public sealed record TakeCallRequest(string AgentId);
 
 public sealed record TakeCallResult(bool Success, string Message);
 
@@ -89,4 +95,5 @@ public static class CallsHub
     public const string CallUpdated = nameof(CallUpdated);
     public const string TranscriptAdded = nameof(TranscriptAdded);
     public const string CallEventAdded = nameof(CallEventAdded);
+    public const string AgentUpdated = nameof(AgentUpdated);
 }

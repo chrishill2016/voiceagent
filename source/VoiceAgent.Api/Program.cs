@@ -6,6 +6,7 @@ using Azure.Identity;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Options;
 using VoiceAgent.Api;
+using VoiceAgent.Api.Features.Agents;
 using VoiceAgent.Api.Features.Calls;
 using VoiceAgent.Api.Features.Customers;
 using VoiceAgent.Api.Features.Media;
@@ -21,6 +22,7 @@ builder.Services.Configure<AcsOptions>(config.GetSection(AcsOptions.Section));
 builder.Services.Configure<CosmosOptions>(config.GetSection(CosmosOptions.Section));
 builder.Services.Configure<DemoOptions>(config.GetSection(DemoOptions.Section));
 builder.Services.Configure<VoiceLiveOptions>(config.GetSection(VoiceLiveOptions.Section));
+builder.Services.Configure<QueueOptions>(config.GetSection(QueueOptions.Section));
 
 builder.Services.ConfigureHttpJsonOptions(o => o.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddSignalR().AddJsonProtocol(o => o.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
@@ -47,11 +49,13 @@ if (!string.IsNullOrWhiteSpace(cosmos.Endpoint))
     builder.Services.AddSingleton<CosmosCustomerRepository>();
     builder.Services.AddSingleton<ICustomerRepository>(sp => sp.GetRequiredService<CosmosCustomerRepository>());
     builder.Services.AddHostedService<SampleDataSeeder>();
+    builder.Services.AddSingleton<IAgentStore>(sp => new CosmosAgentStore(sp.GetRequiredService<CosmosClient>(), cosmos));
 }
 else
 {
     builder.Services.AddSingleton<ICallStore, InMemoryCallStore>();
     builder.Services.AddSingleton<ICustomerRepository>(_ => new InMemoryCustomerRepository(SampleData.LoadCustomers()));
+    builder.Services.AddSingleton<IAgentStore, InMemoryAgentStore>();
 }
 
 // Telephony: Azure Communication Services Call Automation, when configured.
@@ -67,7 +71,9 @@ builder.Services.AddSingleton<ICallControl>(sp => new AcsCallControl(
 
 builder.Services.AddSingleton<ICallNotifier, SignalRCallNotifier>();
 builder.Services.AddSingleton<CallTracker>();
+builder.Services.AddSingleton<AgentDirectory>();
 builder.Services.AddSingleton<AgentQueue>();
+builder.Services.AddHostedService<QueueDispatcher>();
 builder.Services.AddSingleton<AgentToolHandler>();
 builder.Services.AddSingleton<IVoiceLiveConnectionFactory, VoiceLiveConnectionFactory>();
 builder.Services.AddSingleton<CallAudioBridge>();
@@ -87,6 +93,7 @@ app.UseStaticFiles();
 app.MapHealthChecks("/healthz");
 app.MapHub<CallsHubEndpoint>(VoiceAgent.Shared.CallsHub.Path);
 app.MapCallApi();
+app.MapAgentApi();
 app.MapTelephony();
 app.MapMedia();
 app.MapFallbackToFile("index.html");
