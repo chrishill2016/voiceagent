@@ -19,7 +19,7 @@ public class CallAudioBridgeTests
         Assert.Equal("session.update", _h.VoiceLive.SentTypes.First());
 
         _caller.Say("AQI=");
-        _h.VoiceLive.Push(new VoiceLiveEvent.AudioDelta("BBB="));
+        _h.VoiceLive.Push(new VoiceLiveEvent.AudioDelta("AQID"));
         _h.VoiceLive.Push(new VoiceLiveEvent.AgentTranscript("Thanks for calling."));
         _h.VoiceLive.Push(new VoiceLiveEvent.CallerStartedSpeaking());
         _h.VoiceLive.Push(new VoiceLiveEvent.CallerTranscript("When will I exchange?"));
@@ -29,7 +29,7 @@ public class CallAudioBridgeTests
 
         lock (_caller.Received)
         {
-            Assert.Contains(_caller.Received, m => m.Contains("BBB="));
+            Assert.Contains(_caller.Received, m => m.Contains("\"Data\":\"AQID\""));
             Assert.Contains(_caller.Received, m => m.Contains("StopAudio"));
         }
         Assert.Equal(CallStage.IdentifyingCase, session.Summary.Stage);

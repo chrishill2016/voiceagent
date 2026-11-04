@@ -122,9 +122,13 @@ window.voiceAgent = (() => {
 
         socket.onmessage = e => {
             const msg = JSON.parse(e.data);
-            if (msg.kind === 'TestCallStarted') dotnetRef.invokeMethodAsync('OnCallStarted', msg.callId);
-            else if (msg.kind === 'AudioData' && msg.audioData?.data) play(fromBase64Pcm16(msg.audioData.data));
-            else if (msg.kind === 'StopAudio') stopPlayback();
+            // The server uses the ACS SDK's outbound format ("Kind", "AudioData", "Data"); accept either casing.
+            const kind = msg.kind ?? msg.Kind;
+            const audio = msg.audioData ?? msg.AudioData;
+            const data = audio?.data ?? audio?.Data;
+            if (kind === 'TestCallStarted') dotnetRef.invokeMethodAsync('OnCallStarted', msg.callId);
+            else if (kind === 'AudioData' && data) play(fromBase64Pcm16(data));
+            else if (kind === 'StopAudio') stopPlayback();
         };
         socket.onclose = () => finish(null);
         socket.onerror = () => finish('The connection to the server failed.');

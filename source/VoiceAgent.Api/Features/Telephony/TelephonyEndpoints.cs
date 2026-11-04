@@ -26,7 +26,11 @@ public static class TelephonyEndpoints
         ILogger<CallTracker> logger)
     {
         var acs = options.Value;
-        if (!CallbackToken.IsValid(context, acs)) return Results.Unauthorized();
+        if (!CallbackToken.IsValid(context, acs))
+        {
+            logger.LogWarning("Rejected incoming-call webhook: missing or wrong ?token=");
+            return Results.Unauthorized();
+        }
 
         var body = await JsonNode.ParseAsync(context.Request.Body);
         var events = body as JsonArray ?? [body];
@@ -37,7 +41,10 @@ public static class TelephonyEndpoints
             var data = evt["data"] as JsonObject;
 
             if (eventType == "Microsoft.EventGrid.SubscriptionValidationEvent")
+            {
+                logger.LogInformation("Answered Event Grid subscription validation");
                 return Results.Ok(new { validationResponse = data?["validationCode"]?.GetValue<string>() });
+            }
 
             if (eventType != "Microsoft.Communication.IncomingCall" || data is null) continue;
 
@@ -57,6 +64,7 @@ public static class TelephonyEndpoints
                 ?? "Unknown caller";
 
             var callId = Guid.NewGuid().ToString("n");
+            logger.LogInformation("Incoming call {CallId} from {Caller}", callId, callerNumber);
             var baseUrl = acs.PublicBaseUrl.TrimEnd('/');
             var callbackUri = new Uri(CallbackToken.Append($"{baseUrl}/api/acs/callbacks/{callId}", acs));
             var mediaUri = new Uri(CallbackToken.Append($"{baseUrl.Replace("https://", "wss://")}/ws/media/{callId}", acs));
@@ -85,6 +93,7 @@ public static class TelephonyEndpoints
             {
                 var result = await client.AnswerCallAsync(answer);
                 session.CallConnectionId = result.Value.CallConnectionProperties.CallConnectionId;
+                logger.LogInformation("Answered call {CallId}; waiting for ACS to open the media stream at {MediaUri}", callId, mediaUri.GetLeftPart(UriPartial.Path));
                 await tracker.AddEventAsync(session, "Call answered");
             }
             catch (Exception ex)
@@ -105,7 +114,11 @@ public static class TelephonyEndpoints
         AgentQueue queue,
         ILogger<CallTracker> logger)
     {
-        if (!CallbackToken.IsValid(context, options.Value)) return Results.Unauthorized();
+        if (!CallbackToken.IsValid(context, options.Value))
+        {
+            logger.LogWarning("Rejected Call Automation callback for {CallId}: missing or wrong ?token=", callId);
+            return Results.Unauthorized();
+        }
 
         using var reader = new StreamReader(context.Request.Body);
         var body = await reader.ReadToEndAsync();
@@ -122,7 +135,12 @@ public static class TelephonyEndpoints
                     await tracker.AddEventAsync(session, "Call connected");
                     break;
 
+                case MediaStreamingStarted:
+                    await tracker.AddEventAsync(session, "Call audio streaming started");
+                    break;
+
                 case MediaStreamingFailed failed:
+                    logger.LogWarning("Media streaming failed for {CallId}: {Message}", callId, failed.ResultInformation?.Message);
                     await tracker.AddEventAsync(session, $"Media streaming failed: {failed.ResultInformation?.Message}");
                     break;
 

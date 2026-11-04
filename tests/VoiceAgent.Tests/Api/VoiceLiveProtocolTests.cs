@@ -95,12 +95,34 @@ public class AcsMediaMessagesTests
     }
 
     [Fact]
-    public void Builds_outbound_audio_and_stop_messages()
+    public void Builds_outbound_audio_and_stop_messages_in_the_casing_acs_expects()
     {
-        Assert.Contains("\"kind\":\"AudioData\"", AcsMediaMessages.OutboundAudio("AQI="));
-        Assert.Contains("\"data\":\"AQI=\"", AcsMediaMessages.OutboundAudio("AQI="));
-        Assert.Contains("\"kind\":\"StopAudio\"", AcsMediaMessages.StopAudio());
+        // ACS ignores outbound media in the wrong casing, which leaves callers in silence.
+        Assert.Contains("\"Kind\":\"AudioData\"", AcsMediaMessages.OutboundAudio("AQI="));
+        Assert.Contains("\"Data\":\"AQI=\"", AcsMediaMessages.OutboundAudio("AQI="));
+        Assert.Contains("\"Kind\":\"StopAudio\"", AcsMediaMessages.StopAudio());
     }
+
+    [Fact]
+    public void Outbound_messages_match_the_acs_sdk_exactly()
+    {
+        Assert.Equal(Azure.Communication.CallAutomation.OutStreamingData.GetAudioDataForOutbound([1, 2]), AcsMediaMessages.OutboundAudio("AQI="));
+        Assert.Equal(Azure.Communication.CallAutomation.OutStreamingData.GetStopAudioForOutbound(), AcsMediaMessages.StopAudio());
+    }
+
+    [Fact]
+    public void Inbound_audio_in_the_format_acs_sends_is_understood_by_both_the_sdk_and_the_app()
+    {
+        const string fromAcs = """{"kind":"AudioData","audioData":{"timestamp":"2026-11-04T17:00:00Z","participantRawID":"4:+447700900101","data":"AQI=","silent":false}}""";
+        Assert.IsType<Azure.Communication.CallAutomation.AudioData>(Azure.Communication.CallAutomation.StreamingData.Parse(fromAcs));
+        Assert.Equal("AQI=", Assert.IsType<InboundMedia.Audio>(AcsMediaMessages.Parse(fromAcs)).Base64Pcm);
+    }
+
+    [Theory]
+    [InlineData("""{"kind":"AudioData","audioData":{"data":"AQI=","silent":false}}""")]
+    [InlineData("""{"Kind":"AudioData","AudioData":{"Data":"AQI=","IsSilent":false}}""")]
+    public void Parses_inbound_audio_in_either_casing(string json) =>
+        Assert.Equal("AQI=", Assert.IsType<InboundMedia.Audio>(AcsMediaMessages.Parse(json)).Base64Pcm);
 
     [Theory]
     [InlineData("+447700900999", "4:+447700900999")]
