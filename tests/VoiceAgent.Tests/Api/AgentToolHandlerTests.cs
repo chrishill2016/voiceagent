@@ -100,6 +100,8 @@ public class AgentToolHandlerTests
 
         var verified = await Call(session, ToolNames.VerifyIdentity, HughesAnswers);
         Assert.True(verified["verified"]!.GetValue<bool>());
+        // The progress update comes back with a successful verification, saving a model round trip.
+        Assert.Equal("Searches", verified["case_details"]!["stage"]!.GetValue<string>());
         Assert.Equal("Amelia Hughes and Tom Hughes", session.Summary.ClientName);
         Assert.Equal(CallStage.Verified, session.Summary.Stage);
 
@@ -163,6 +165,7 @@ public class AgentToolHandlerTests
 
         var result = await Call(session, ToolNames.VerifyIdentity, WrongAnswers);
 
+        Assert.Null(result["case_details"]);
         var json = result.ToJsonString().ToLowerInvariant();
         Assert.DoesNotContain("lender was", json);
         Assert.DoesNotContain("nationwide", json);

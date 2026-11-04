@@ -10,15 +10,30 @@ public static class MediaEndpoints
     public static IEndpointRouteBuilder MapMedia(this IEndpointRouteBuilder app)
     {
         // Bidirectional audio for a real phone call, opened by ACS after the call is answered.
-        app.Map("/ws/media/{callId}", async (string callId, HttpContext context, IOptions<AcsOptions> options, CallTracker tracker, CallAudioBridge bridge) =>
+        app.Map("/ws/media/{callId}", async (string callId, HttpContext context, IOptions<AcsOptions> options, CallTracker tracker, CallAudioBridge bridge, ILogger<CallAudioBridge> logger) =>
         {
-            if (!context.WebSockets.IsWebSocketRequest) return Results.BadRequest();
-            if (!CallbackToken.IsValid(context, options.Value)) return Results.Unauthorized();
+            if (!context.WebSockets.IsWebSocketRequest)
+            {
+                logger.LogWarning("Media request for {CallId} was not a WebSocket request", callId);
+                return Results.BadRequest();
+            }
+
+            if (!CallbackToken.IsValid(context, options.Value))
+            {
+                logger.LogWarning("Rejected media stream for {CallId}: missing or wrong ?token=", callId);
+                return Results.Unauthorized();
+            }
 
             var session = tracker.Get(callId);
-            if (session is null) return Results.NotFound();
+            if (session is null)
+            {
+                logger.LogWarning("Media stream opened for unknown call {CallId}", callId);
+                return Results.NotFound();
+            }
 
             using var socket = await context.WebSockets.AcceptWebSocketAsync();
+            logger.LogInformation("Media stream connected for call {CallId}", callId);
+            await tracker.AddEventAsync(session, "Call audio connected");
             await bridge.RunAsync(session, new WebSocketCallerChannel(socket), context.RequestAborted);
             await tracker.EndAsync(callId, "Call audio stream closed");
             return Results.Empty;

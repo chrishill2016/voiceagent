@@ -10,6 +10,7 @@ public abstract record VoiceLiveEvent
     public sealed record SessionReady : VoiceLiveEvent;
     public sealed record AudioDelta(string Base64Audio) : VoiceLiveEvent;
     public sealed record CallerStartedSpeaking : VoiceLiveEvent;
+    public sealed record CallerStoppedSpeaking : VoiceLiveEvent;
     public sealed record CallerTranscript(string Text) : VoiceLiveEvent;
     public sealed record AgentTranscript(string Text) : VoiceLiveEvent;
     public sealed record FunctionCall(string CallId, string Name, string Arguments) : VoiceLiveEvent;
@@ -125,6 +126,7 @@ public static class VoiceLiveProtocol
             "session.created" or "session.updated" => new VoiceLiveEvent.SessionReady(),
             "response.audio.delta" or "response.output_audio.delta" => new VoiceLiveEvent.AudioDelta(Str(message, "delta") ?? string.Empty),
             "input_audio_buffer.speech_started" => new VoiceLiveEvent.CallerStartedSpeaking(),
+            "input_audio_buffer.speech_stopped" => new VoiceLiveEvent.CallerStoppedSpeaking(),
             "conversation.item.input_audio_transcription.completed" => new VoiceLiveEvent.CallerTranscript(Str(message, "transcript") ?? string.Empty),
             "response.audio_transcript.done" or "response.output_audio_transcript.done" => new VoiceLiveEvent.AgentTranscript(Str(message, "transcript") ?? string.Empty),
             "response.function_call_arguments.done" => new VoiceLiveEvent.FunctionCall(

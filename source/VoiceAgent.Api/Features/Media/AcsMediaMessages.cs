@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Azure.Communication.CallAutomation;
 
 namespace VoiceAgent.Api.Features.Media;
 
@@ -13,15 +14,19 @@ public abstract record InboundMedia
 /// <summary>
 /// The JSON messages Azure Communication Services uses for bidirectional media streaming.
 /// The browser test call page speaks the same format, so both share one code path.
+/// Outbound messages are built with the Call Automation SDK so the casing ("Kind", "AudioData", "Data")
+/// is exactly what ACS expects; inbound parsing accepts either casing.
 /// </summary>
 public static class AcsMediaMessages
 {
+    private static readonly JsonNodeOptions CaseInsensitive = new() { PropertyNameCaseInsensitive = true };
+
     public static InboundMedia Parse(string json)
     {
         JsonObject? message;
         try
         {
-            message = JsonNode.Parse(json) as JsonObject;
+            message = JsonNode.Parse(json, CaseInsensitive) as JsonObject;
         }
         catch (JsonException)
         {
@@ -49,21 +54,10 @@ public static class AcsMediaMessages
     }
 
     public static string OutboundAudio(string base64Pcm) =>
-        new JsonObject
-        {
-            ["kind"] = "AudioData",
-            ["audioData"] = new JsonObject { ["data"] = base64Pcm },
-            ["stopAudio"] = null,
-        }.ToJsonString();
+        OutStreamingData.GetAudioDataForOutbound(Convert.FromBase64String(base64Pcm));
 
     /// <summary>Tells ACS to drop any agent audio still buffered, used when the caller interrupts.</summary>
-    public static string StopAudio() =>
-        new JsonObject
-        {
-            ["kind"] = "StopAudio",
-            ["audioData"] = null,
-            ["stopAudio"] = new JsonObject(),
-        }.ToJsonString();
+    public static string StopAudio() => OutStreamingData.GetStopAudioForOutbound();
 
     private static string? Str(JsonObject? obj, string name) =>
         obj?[name] is JsonValue v && v.TryGetValue<string>(out var s) ? s : null;
