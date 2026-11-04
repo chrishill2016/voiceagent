@@ -70,6 +70,14 @@ dotnet run --project source/VoiceAgent.Api
 
 The **Sample cases** page lists the fictional cases and their security answers. For example, case `1042/2617` is Amelia and Tom Hughes's purchase, at the searches stage. Find it by case number, or by postcode `LS6 2QT` and surname Hughes. For security, the answers are "Amelia Hughes", previous lender "Nationwide", and date of birth 14 March 1985.
 
+### Visual Studio
+
+1. Open `VoiceAgent.slnx`.
+2. Right-click **VoiceAgent.Api** and choose **Set as Startup Project**. Don't run `VoiceAgent.Portal` on its own: the API serves the portal and provides the live updates, calls and queue it needs.
+3. Press **F5**. The portal opens at `https://localhost:7005`. Breakpoints work in both the API and the portal's Blazor code.
+
+If you see *"Unable to launch browser… Could not find any debuggable target"*, check that VoiceAgent.Api is the startup project. If it still happens, use Edge or Chrome as the browser, close other windows of that browser, and try again. Ctrl+F5 (run without debugging) always works.
+
 Run the tests:
 
 ```bash
