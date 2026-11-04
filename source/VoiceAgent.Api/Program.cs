@@ -86,10 +86,11 @@ if (app.Environment.IsDevelopment())
 
 app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSeconds(30) });
 
-// The agent portal (Blazor WebAssembly) is served from this app.
-app.UseBlazorFrameworkFiles();
-app.UseStaticFiles();
 
+// The agent portal (Blazor WebAssembly) is served from this app. In .NET 10 MapStaticAssets replaces
+// UseBlazorFrameworkFiles/UseStaticFiles: it maps plain names such as _framework/blazor.webassembly.js
+// to the fingerprinted, pre-compressed files the publish step produces.
+app.MapStaticAssets();
 app.MapHealthChecks("/healthz");
 app.MapHub<CallsHubEndpoint>(VoiceAgent.Shared.CallsHub.Path);
 app.MapCallApi();
