@@ -7,7 +7,13 @@ namespace VoiceAgent.Api.Features.VoiceLive;
 /// <summary>Events from Voice Live that the call bridge cares about.</summary>
 public abstract record VoiceLiveEvent
 {
+    /// <summary>session.created: the connection is open, but our session.update may not be applied yet.</summary>
+    public sealed record SessionCreated : VoiceLiveEvent;
+
+    /// <summary>session.updated: our settings are applied, so a response can be requested.</summary>
     public sealed record SessionReady : VoiceLiveEvent;
+
+    public sealed record ResponseCreated : VoiceLiveEvent;
     public sealed record AudioDelta(string Base64Audio) : VoiceLiveEvent;
     public sealed record CallerStartedSpeaking : VoiceLiveEvent;
     public sealed record CallerStoppedSpeaking : VoiceLiveEvent;
@@ -123,7 +129,9 @@ public static class VoiceLiveProtocol
 
         return type switch
         {
-            "session.created" or "session.updated" => new VoiceLiveEvent.SessionReady(),
+            "session.created" => new VoiceLiveEvent.SessionCreated(),
+            "session.updated" => new VoiceLiveEvent.SessionReady(),
+            "response.created" => new VoiceLiveEvent.ResponseCreated(),
             "response.audio.delta" or "response.output_audio.delta" => new VoiceLiveEvent.AudioDelta(Str(message, "delta") ?? string.Empty),
             "input_audio_buffer.speech_started" => new VoiceLiveEvent.CallerStartedSpeaking(),
             "input_audio_buffer.speech_stopped" => new VoiceLiveEvent.CallerStoppedSpeaking(),

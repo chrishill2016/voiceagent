@@ -137,4 +137,23 @@ public class CallAudioBridgeTests
 
         await Eventually.TrueAsync(() => _h.VoiceLive.Disposed, "prewarmed connection disposed");
     }
+
+    [Fact]
+    public async Task The_greeting_is_requested_only_after_voice_live_confirms_the_session()
+    {
+        _h.VoiceLive.ConfirmSession = false;
+        var session = await _h.StartCallAsync(isTestCall: false);
+        var bridge = _h.Bridge();
+
+        bridge.Prewarm(session);
+        await Eventually.TrueAsync(() => _h.VoiceLive.SentTypes.Contains("session.update"), "settings sent");
+        await Task.Delay(100);
+        Assert.DoesNotContain("response.create", _h.VoiceLive.SentTypes);
+
+        _h.VoiceLive.Push(new VoiceLiveEvent.SessionReady());
+
+        await Eventually.TrueAsync(() => _h.VoiceLive.SentTypes.Contains("response.create"), "greeting requested once the session is confirmed");
+        var types = _h.VoiceLive.SentTypes.ToList();
+        Assert.True(types.IndexOf("session.update") < types.IndexOf("response.create"));
+    }
 }

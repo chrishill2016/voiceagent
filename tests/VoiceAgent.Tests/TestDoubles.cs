@@ -67,9 +67,14 @@ public sealed class FakeVoiceLive : IVoiceLiveConnectionFactory, IVoiceLiveConne
         return Task.FromResult<IVoiceLiveConnection>(this);
     }
 
+    /// <summary>When true (the default) the fake answers session.update with session.updated, like Voice Live.</summary>
+    public bool ConfirmSession { get; set; } = true;
+
     public Task SendAsync(JsonObject message, CancellationToken ct)
     {
         lock (Sent) Sent.Add(message);
+        if (ConfirmSession && message["type"]?.GetValue<string>() == "session.update")
+            Push(new VoiceLiveEvent.SessionReady());
         return Task.CompletedTask;
     }
 

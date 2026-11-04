@@ -64,7 +64,9 @@ public class VoiceLiveProtocolTests
     [InlineData("""{"type":"response.function_call_arguments.done","call_id":"c1","name":"find_customer","arguments":"{}"}""", typeof(VoiceLiveEvent.FunctionCall))]
     [InlineData("""{"type":"response.done"}""", typeof(VoiceLiveEvent.ResponseDone))]
     [InlineData("""{"type":"error","error":{"message":"bad"}}""", typeof(VoiceLiveEvent.Error))]
-    [InlineData("""{"type":"session.created"}""", typeof(VoiceLiveEvent.SessionReady))]
+    [InlineData("""{"type":"session.created"}""", typeof(VoiceLiveEvent.SessionCreated))]
+    [InlineData("""{"type":"session.updated"}""", typeof(VoiceLiveEvent.SessionReady))]
+    [InlineData("""{"type":"response.created"}""", typeof(VoiceLiveEvent.ResponseCreated))]
     [InlineData("""{"type":"rate_limits.updated"}""", typeof(VoiceLiveEvent.Other))]
     [InlineData("not json", typeof(VoiceLiveEvent.Error))]
     public void Parses_voice_live_events(string json, Type expected) =>

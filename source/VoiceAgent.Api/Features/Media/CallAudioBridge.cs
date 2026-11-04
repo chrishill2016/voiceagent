@@ -17,6 +17,9 @@ public sealed class CallAudioBridge
 {
     private static readonly TimeSpan PrewarmTimeout = TimeSpan.FromSeconds(20);
 
+    /// <summary>How long to wait for Voice Live to confirm the session before asking for the greeting anyway.</summary>
+    private static readonly TimeSpan SessionReadyTimeout = TimeSpan.FromSeconds(5);
+
     private readonly IVoiceLiveConnectionFactory _voiceLive;
     private readonly AgentToolHandler _tools;
     private readonly CallTracker _tracker;
@@ -58,11 +61,49 @@ public sealed class CallAudioBridge
         var clock = System.Diagnostics.Stopwatch.StartNew();
         using var timeout = new CancellationTokenSource(PrewarmTimeout);
         var connection = await _voiceLive.ConnectAsync(timeout.Token);
-        await connection.SendAsync(VoiceLiveProtocol.SessionUpdate(_options), timeout.Token);
-        if (_options.GreetOnConnect)
-            await connection.SendAsync(VoiceLiveProtocol.CreateResponse(), timeout.Token);
+        await ConfigureAndGreetAsync(connection, callId, timeout.Token);
         _logger.LogInformation("Call {CallId}: Voice Live ready (prewarmed) in {Ms} ms", callId, clock.ElapsedMilliseconds);
         return connection;
+    }
+
+    /// <summary>
+    /// Sends the session settings, waits for Voice Live to confirm them (session.updated), then asks for the greeting.
+    /// Asking for a response before the session is confirmed can be ignored, leaving the caller in silence until they speak.
+    /// </summary>
+    private async Task ConfigureAndGreetAsync(IVoiceLiveConnection connection, string callId, CancellationToken ct)
+    {
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        await connection.SendAsync(VoiceLiveProtocol.SessionUpdate(_options), ct);
+
+        using var wait = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        wait.CancelAfter(SessionReadyTimeout);
+        var ready = false;
+        try
+        {
+            await foreach (var evt in connection.ReadEventsAsync(wait.Token))
+            {
+                if (evt is VoiceLiveEvent.SessionReady)
+                {
+                    ready = true;
+                    break;
+                }
+
+                if (evt is VoiceLiveEvent.Error e)
+                    _logger.LogWarning("Call {CallId}: Voice Live error while setting up the session: {Message}", callId, e.Message);
+            }
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            // Timed out waiting; carry on and ask for the greeting anyway.
+        }
+
+        _logger.LogInformation(ready
+            ? "Call {CallId}: Voice Live session confirmed in {Ms} ms"
+            : "Call {CallId}: no session confirmation from Voice Live after {Ms} ms; requesting the greeting anyway",
+            callId, clock.ElapsedMilliseconds);
+
+        if (_options.GreetOnConnect)
+            await connection.SendAsync(VoiceLiveProtocol.CreateResponse(), ct);
     }
 
     private async Task DiscardPrewarmedAsync(CallSummary call)
@@ -95,9 +136,7 @@ public sealed class CallAudioBridge
             {
                 connection = await _voiceLive.ConnectAsync(aiCts.Token);
                 _logger.LogInformation("Call {CallId}: connected to Voice Live in {Ms} ms", session.Id, clock.ElapsedMilliseconds);
-                await connection.SendAsync(VoiceLiveProtocol.SessionUpdate(_options), aiCts.Token);
-                if (_options.GreetOnConnect)
-                    await connection.SendAsync(VoiceLiveProtocol.CreateResponse(), aiCts.Token);
+                await ConfigureAndGreetAsync(connection, session.Id, aiCts.Token);
             }
 
             await _tracker.UpdateAsync(session, s => s with
@@ -170,6 +209,10 @@ public sealed class CallAudioBridge
                         callerStoppedAt = clock.ElapsedMilliseconds;
                         break;
 
+                    case VoiceLiveEvent.ResponseCreated when !greeted:
+                        _logger.LogInformation("Call {CallId}: greeting response started {Ms} ms after the call audio connected", session.Id, clock.ElapsedMilliseconds);
+                        break;
+
                     case VoiceLiveEvent.CallerStartedSpeaking:
                         // Barge-in: stop playing the agent's reply as soon as the caller talks.
                         await caller.SendAsync(AcsMediaMessages.StopAudio(), ct);
@@ -208,7 +251,7 @@ public sealed class CallAudioBridge
                         break;
 
                     case VoiceLiveEvent.Error e:
-                        _logger.LogWarning("Voice Live error on call {CallId}: {Message}", session.Id, e.Message);
+                        _logger.LogWarning("Call {CallId}: Voice Live error: {Message}", session.Id, e.Message);
                         await _tracker.AddEventAsync(session, $"Voice agent error: {e.Message}");
                         break;
                 }
