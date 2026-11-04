@@ -154,7 +154,14 @@ public sealed class AgentToolHandler(
                     CaseId = account.Id,
                 });
                 await tracker.AddEventAsync(session, $"Security passed for case {account.CaseNumber} ({account.ClientNames})");
-                return Output(new { verified = true, next_step = "Thank the caller and call get_case_details." });
+                await tracker.AddEventAsync(session, $"Shared progress update: {account.CaseNumber} ({account.Stage})");
+                // Return the progress update straight away: one fewer model round trip before the caller hears it.
+                return Output(new
+                {
+                    verified = true,
+                    next_step = "Thank the caller and give them the progress update from case_details now.",
+                    case_details = CaseDetails(account),
+                });
 
             case VerificationDecision.RetryAllowed:
                 session.RecordFailedVerification();
@@ -192,35 +199,37 @@ public sealed class AgentToolHandler(
             return Output(new { error = "The caller has not passed security. Do not share any details." });
 
         await tracker.AddEventAsync(session, $"Shared progress update: {c.CaseNumber} ({c.Stage})");
-
-        return Output(new
-        {
-            client_names = c.ClientNames,
-            case_number = c.CaseNumber,
-            matter_type = c.MatterType,
-            property = c.PropertyAddress,
-            stage = c.Stage,
-            case_handler = c.CaseHandler,
-            latest_update = c.LatestUpdate,
-            waiting_on = c.WaitingOn,
-            next_step = c.NextStep,
-            target_exchange_date = SpokenDate(c.TargetExchangeDate),
-            completion_date = SpokenDate(c.CompletionDate),
-            last_updated = SpokenDate(c.LastUpdatedOn),
-            milestones = c.Milestones.Select(m => new
-            {
-                name = m.Name,
-                status = m.Status switch
-                {
-                    MilestoneStatus.Done => "done",
-                    MilestoneStatus.InProgress => "in progress",
-                    _ => "not started",
-                },
-                completed_on = SpokenDate(m.CompletedOn),
-            }),
-            note = c.IsCompleted ? "This case has completed. Ask how else you can help, or offer a transfer." : null,
-        });
+        return Output(CaseDetails(c));
     }
+
+    /// <summary>The progress update the agent reads from, shared by verify_identity (on success) and get_case_details.</summary>
+    private static object CaseDetails(ConveyancingCase c) => new
+    {
+        client_names = c.ClientNames,
+        case_number = c.CaseNumber,
+        matter_type = c.MatterType,
+        property = c.PropertyAddress,
+        stage = c.Stage,
+        case_handler = c.CaseHandler,
+        latest_update = c.LatestUpdate,
+        waiting_on = c.WaitingOn,
+        next_step = c.NextStep,
+        target_exchange_date = SpokenDate(c.TargetExchangeDate),
+        completion_date = SpokenDate(c.CompletionDate),
+        last_updated = SpokenDate(c.LastUpdatedOn),
+        milestones = c.Milestones.Select(m => new
+        {
+            name = m.Name,
+            status = m.Status switch
+            {
+                MilestoneStatus.Done => "done",
+                MilestoneStatus.InProgress => "in progress",
+                _ => "not started",
+            },
+            completed_on = SpokenDate(m.CompletedOn),
+        }),
+        note = c.IsCompleted ? "This case has completed. Ask how else you can help, or offer a transfer." : null,
+    };
 
     private static string? SpokenDate(DateOnly? date) => date?.ToString("dddd d MMMM yyyy");
 

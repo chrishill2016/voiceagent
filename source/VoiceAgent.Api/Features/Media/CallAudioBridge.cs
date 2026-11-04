@@ -25,10 +25,12 @@ public sealed class CallAudioBridge(
     {
         using var aiCts = CancellationTokenSource.CreateLinkedTokenSource(callEnded, session.AiStopped);
         IVoiceLiveConnection? connection = null;
+        var clock = System.Diagnostics.Stopwatch.StartNew();
 
         try
         {
             connection = await voiceLive.ConnectAsync(aiCts.Token);
+            logger.LogInformation("Call {CallId}: connected to Voice Live in {Ms} ms", session.Id, clock.ElapsedMilliseconds);
             await connection.SendAsync(VoiceLiveProtocol.SessionUpdate(options.Value), aiCts.Token);
             if (options.Value.GreetOnConnect)
                 await connection.SendAsync(VoiceLiveProtocol.CreateResponse(), aiCts.Token);
@@ -49,7 +51,7 @@ public sealed class CallAudioBridge(
 
         var agentLoop = connection is null
             ? Task.CompletedTask
-            : RunAgentLoopAsync(session, connection, caller, aiCts);
+            : RunAgentLoopAsync(session, connection, caller, aiCts, clock);
 
         // Keep the caller's line open for the whole call, forwarding audio only while the AI is active.
         await foreach (var raw in caller.ReceiveAsync(callEnded))
@@ -72,10 +74,12 @@ public sealed class CallAudioBridge(
         if (connection is not null) await connection.DisposeAsync();
     }
 
-    private async Task RunAgentLoopAsync(CallSession session, IVoiceLiveConnection connection, ICallerAudioChannel caller, CancellationTokenSource aiCts)
+    private async Task RunAgentLoopAsync(CallSession session, IVoiceLiveConnection connection, ICallerAudioChannel caller, CancellationTokenSource aiCts, System.Diagnostics.Stopwatch clock)
     {
         var ct = aiCts.Token;
         var toolCallsThisResponse = 0;
+        var greeted = false;
+        long? callerStoppedAt = null;
 
         try
         {
@@ -84,7 +88,21 @@ public sealed class CallAudioBridge(
                 switch (evt)
                 {
                     case VoiceLiveEvent.AudioDelta { Base64Audio.Length: > 0 } audio:
+                        if (!greeted)
+                        {
+                            greeted = true;
+                            logger.LogInformation("Call {CallId}: first agent audio {Ms} ms after the call audio connected", session.Id, clock.ElapsedMilliseconds);
+                        }
+                        else if (callerStoppedAt is { } stopped)
+                        {
+                            logger.LogInformation("Call {CallId}: agent replied {Ms} ms after the caller stopped speaking", session.Id, clock.ElapsedMilliseconds - stopped);
+                        }
+                        callerStoppedAt = null;
                         await caller.SendAsync(AcsMediaMessages.OutboundAudio(audio.Base64Audio), ct);
+                        break;
+
+                    case VoiceLiveEvent.CallerStoppedSpeaking:
+                        callerStoppedAt = clock.ElapsedMilliseconds;
                         break;
 
                     case VoiceLiveEvent.CallerStartedSpeaking:
@@ -102,8 +120,9 @@ public sealed class CallAudioBridge(
 
                     case VoiceLiveEvent.FunctionCall call:
                         toolCallsThisResponse++;
-                        logger.LogInformation("Call {CallId}: tool {Tool}", session.Id, call.Name);
+                        var toolClock = System.Diagnostics.Stopwatch.StartNew();
                         var output = await tools.HandleAsync(session, call.Name, call.Arguments, ct);
+                        logger.LogInformation("Call {CallId}: tool {Tool} took {Ms} ms", session.Id, call.Name, toolClock.ElapsedMilliseconds);
                         await connection.SendAsync(VoiceLiveProtocol.FunctionCallOutput(call.CallId, output), ct);
                         break;
 
