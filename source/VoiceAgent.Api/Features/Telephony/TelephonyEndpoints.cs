@@ -22,6 +22,7 @@ public static class TelephonyEndpoints
         IOptions<AcsOptions> options,
         CallTracker tracker,
         ICaseRepository cases,
+        VoiceAgent.Api.Features.Media.CallAudioBridge bridge,
         IServiceProvider services,
         ILogger<CallTracker> logger)
     {
@@ -71,6 +72,9 @@ public static class TelephonyEndpoints
 
             var session = await tracker.StartAsync(callId, callerNumber, isTestCall: false);
             session.CallerRawId = from?["rawId"]?.GetValue<string>();
+
+            // Connect to Voice Live and start the greeting while ACS answers and opens the audio stream.
+            bridge.Prewarm(session);
 
             // Caller ID is only a hint for the human agent; the caller must still pass security.
             if (await cases.FindByPhoneNumberAsync(callerNumber) is { } match)

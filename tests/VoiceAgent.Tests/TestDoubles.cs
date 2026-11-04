@@ -58,8 +58,14 @@ public sealed class FakeVoiceLive : IVoiceLiveConnectionFactory, IVoiceLiveConne
 
     public IEnumerable<string> SentTypes { get { lock (Sent) return Sent.Select(s => s["type"]!.GetValue<string>()).ToList(); } }
 
-    public Task<IVoiceLiveConnection> ConnectAsync(CancellationToken ct) =>
-        FailToConnect ? throw new InvalidOperationException("No Voice Live") : Task.FromResult<IVoiceLiveConnection>(this);
+    public int Connects { get; private set; }
+
+    public Task<IVoiceLiveConnection> ConnectAsync(CancellationToken ct)
+    {
+        if (FailToConnect) throw new InvalidOperationException("No Voice Live");
+        Connects++;
+        return Task.FromResult<IVoiceLiveConnection>(this);
+    }
 
     public Task SendAsync(JsonObject message, CancellationToken ct)
     {

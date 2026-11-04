@@ -99,4 +99,42 @@ public class CallAudioBridgeTests
         _caller.HangUp();
         await run;
     }
+
+    [Fact]
+    public async Task A_prewarmed_connection_is_reused_and_the_early_greeting_reaches_the_caller()
+    {
+        var session = await _h.StartCallAsync(isTestCall: false);
+        var bridge = _h.Bridge();
+
+        bridge.Prewarm(session);
+        await Eventually.TrueAsync(() => _h.VoiceLive.SentTypes.Contains("response.create"), "greeting requested while the call is answered");
+
+        // The greeting audio arrives before the call audio is connected...
+        _h.VoiceLive.Push(new VoiceLiveEvent.AudioDelta("AQID"));
+
+        // ...and is played as soon as the caller's audio stream attaches.
+        var run = bridge.RunAsync(session, _caller, CancellationToken.None);
+        await Eventually.TrueAsync(() => { lock (_caller.Received) return _caller.Received.Any(m => m.Contains("AQID")); }, "greeting plays");
+
+        Assert.Equal(1, _h.VoiceLive.Connects);
+        Assert.Equal(1, _h.VoiceLive.SentTypes.Count(t => t == "session.update"));
+        Assert.Equal(1, _h.VoiceLive.SentTypes.Count(t => t == "response.create"));
+
+        _caller.HangUp();
+        await run;
+    }
+
+    [Fact]
+    public async Task A_prewarmed_connection_is_closed_if_the_call_ends_before_audio_connects()
+    {
+        var session = await _h.StartCallAsync(isTestCall: false);
+        var bridge = _h.Bridge();
+
+        bridge.Prewarm(session);
+        await Eventually.TrueAsync(() => _h.VoiceLive.Connects == 1, "prewarm connected");
+
+        await _h.Tracker.EndAsync(session.Id, "Caller hung up");
+
+        await Eventually.TrueAsync(() => _h.VoiceLive.Disposed, "prewarmed connection disposed");
+    }
 }

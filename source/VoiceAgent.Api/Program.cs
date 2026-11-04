@@ -77,6 +77,7 @@ builder.Services.AddHostedService<QueueDispatcher>();
 builder.Services.AddSingleton<AgentToolHandler>();
 builder.Services.AddSingleton<IVoiceLiveConnectionFactory, VoiceLiveConnectionFactory>();
 builder.Services.AddSingleton<CallAudioBridge>();
+builder.Services.AddHostedService<TokenWarmup>();
 
 var app = builder.Build();
 
