@@ -63,6 +63,7 @@ public class VoiceLiveProtocolTests
     [InlineData("""{"type":"response.audio_transcript.done","transcript":"hello"}""", typeof(VoiceLiveEvent.AgentTranscript))]
     [InlineData("""{"type":"response.function_call_arguments.done","call_id":"c1","name":"find_customer","arguments":"{}"}""", typeof(VoiceLiveEvent.FunctionCall))]
     [InlineData("""{"type":"response.done"}""", typeof(VoiceLiveEvent.ResponseDone))]
+    [InlineData("""{"type":"response.done","response":{"status":"failed","status_details":{"type":"failed","error":{"code":"agent_error","message":"Run failed"}}}}""", typeof(VoiceLiveEvent.ResponseDone))]
     [InlineData("""{"type":"error","error":{"message":"bad"}}""", typeof(VoiceLiveEvent.Error))]
     [InlineData("""{"type":"session.created"}""", typeof(VoiceLiveEvent.SessionCreated))]
     [InlineData("""{"type":"session.updated"}""", typeof(VoiceLiveEvent.SessionReady))]
@@ -71,6 +72,21 @@ public class VoiceLiveProtocolTests
     [InlineData("not json", typeof(VoiceLiveEvent.Error))]
     public void Parses_voice_live_events(string json, Type expected) =>
         Assert.IsType(expected, VoiceLiveProtocol.Parse(json));
+
+    [Fact]
+    public void Failed_responses_carry_their_reason()
+    {
+        var done = Assert.IsType<VoiceLiveEvent.ResponseDone>(VoiceLiveProtocol.Parse(
+            """{"type":"response.done","response":{"status":"failed","status_details":{"type":"failed","error":{"code":"agent_error","message":"Run failed: no user message"}}}}"""));
+        Assert.True(done.Failed);
+        Assert.Equal("Run failed: no user message", done.Reason);
+
+        Assert.False(Assert.IsType<VoiceLiveEvent.ResponseDone>(VoiceLiveProtocol.Parse("""{"type":"response.done","response":{"status":"completed"}}""")).Failed);
+    }
+
+    [Fact]
+    public void The_greeting_note_is_a_user_message() =>
+        Assert.Equal("user", VoiceLiveProtocol.CallConnectedNote()["item"]!["role"]!.GetValue<string>());
 
     [Fact]
     public void Function_call_output_links_back_to_the_call() =>

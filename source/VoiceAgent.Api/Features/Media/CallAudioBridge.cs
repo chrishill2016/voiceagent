@@ -103,7 +103,10 @@ public sealed class CallAudioBridge
             callId, clock.ElapsedMilliseconds);
 
         if (_options.GreetOnConnect)
+        {
+            await connection.SendAsync(VoiceLiveProtocol.CallConnectedNote(), ct);
             await connection.SendAsync(VoiceLiveProtocol.CreateResponse(), ct);
+        }
     }
 
     private async Task DiscardPrewarmedAsync(CallSummary call)
@@ -232,6 +235,13 @@ public sealed class CallAudioBridge
                         var output = await _tools.HandleAsync(session, call.Name, call.Arguments, ct);
                         _logger.LogInformation("Call {CallId}: tool {Tool} took {Ms} ms", session.Id, call.Name, toolClock.ElapsedMilliseconds);
                         await connection.SendAsync(VoiceLiveProtocol.FunctionCallOutput(call.CallId, output), ct);
+                        break;
+
+                    case VoiceLiveEvent.ResponseDone { Failed: true } failed:
+                        // Surface the reason: otherwise a failed agent run just looks like silence.
+                        toolCallsThisResponse = 0;
+                        _logger.LogWarning("Call {CallId}: Voice Live response {Status}: {Reason}", session.Id, failed.Status, failed.Reason ?? "no reason given");
+                        await _tracker.AddEventAsync(session, $"Voice agent response {failed.Status}: {failed.Reason ?? "no reason given"}");
                         break;
 
                     case VoiceLiveEvent.ResponseDone:
