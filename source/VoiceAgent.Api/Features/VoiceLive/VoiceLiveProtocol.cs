@@ -20,7 +20,11 @@ public abstract record VoiceLiveEvent
     public sealed record CallerTranscript(string Text) : VoiceLiveEvent;
     public sealed record AgentTranscript(string Text) : VoiceLiveEvent;
     public sealed record FunctionCall(string CallId, string Name, string Arguments) : VoiceLiveEvent;
-    public sealed record ResponseDone : VoiceLiveEvent;
+    /// <summary>response.done. <paramref name="Status"/> is "completed", "failed", "cancelled" or "incomplete".</summary>
+    public sealed record ResponseDone(string? Status = "completed", string? Reason = null) : VoiceLiveEvent
+    {
+        public bool Failed => Status is "failed" or "incomplete";
+    }
     public sealed record Error(string Message) : VoiceLiveEvent;
     public sealed record Other(string Type) : VoiceLiveEvent;
 }
@@ -97,6 +101,25 @@ public static class VoiceLiveProtocol
         return new JsonObject { ["type"] = "session.update", ["session"] = session };
     }
 
+    /// <summary>
+    /// A short user turn added before the greeting. A Foundry agent needs a user message to run on;
+    /// asking it to respond to an empty conversation makes the run fail and the caller hears nothing.
+    /// </summary>
+    public static JsonObject CallConnectedNote() => new()
+    {
+        ["type"] = "conversation.item.create",
+        ["item"] = new JsonObject
+        {
+            ["type"] = "message",
+            ["role"] = "user",
+            ["content"] = new JsonArray(new JsonObject
+            {
+                ["type"] = "input_text",
+                ["text"] = "[The caller has just been connected and hasn't spoken yet. Greet them now.]",
+            }),
+        },
+    };
+
     public static JsonObject AppendAudio(string base64Pcm) =>
         new() { ["type"] = "input_audio_buffer.append", ["audio"] = base64Pcm };
 
@@ -141,10 +164,20 @@ public static class VoiceLiveProtocol
                 Str(message, "call_id") ?? string.Empty,
                 Str(message, "name") ?? string.Empty,
                 Str(message, "arguments") ?? "{}"),
-            "response.done" => new VoiceLiveEvent.ResponseDone(),
+            "response.done" => ParseResponseDone(message),
             "error" => new VoiceLiveEvent.Error(Str(message?["error"] as JsonObject, "message") ?? "Unknown Voice Live error"),
             _ => new VoiceLiveEvent.Other(type),
         };
+    }
+
+    private static VoiceLiveEvent.ResponseDone ParseResponseDone(JsonObject? message)
+    {
+        var response = message?["response"] as JsonObject;
+        var status = Str(response, "status") ?? "completed";
+        var details = response?["status_details"] as JsonObject;
+        var error = details?["error"] as JsonObject;
+        var reason = Str(error, "message") ?? Str(error, "code") ?? Str(details, "reason") ?? Str(details, "type");
+        return new VoiceLiveEvent.ResponseDone(status, reason);
     }
 
     private static string? Str(JsonObject? obj, string name) =>

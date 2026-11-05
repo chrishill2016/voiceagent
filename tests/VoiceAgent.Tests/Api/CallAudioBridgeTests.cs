@@ -156,4 +156,31 @@ public class CallAudioBridgeTests
         var types = _h.VoiceLive.SentTypes.ToList();
         Assert.True(types.IndexOf("session.update") < types.IndexOf("response.create"));
     }
+
+    [Fact]
+    public async Task The_greeting_is_preceded_by_a_user_turn_so_the_agent_has_something_to_answer()
+    {
+        var session = await _h.StartCallAsync(isTestCall: false);
+        var bridge = _h.Bridge();
+
+        bridge.Prewarm(session);
+        await Eventually.TrueAsync(() => _h.VoiceLive.SentTypes.Contains("response.create"), "greeting requested");
+
+        var types = _h.VoiceLive.SentTypes.ToList();
+        Assert.True(types.IndexOf("conversation.item.create") < types.IndexOf("response.create"));
+    }
+
+    [Fact]
+    public async Task A_failed_response_is_recorded_on_the_call_timeline()
+    {
+        var session = await _h.StartCallAsync();
+        var run = _h.Bridge(new VoiceLiveOptions { GreetOnConnect = false }).RunAsync(session, _caller, CancellationToken.None);
+        await Eventually.TrueAsync(() => _h.VoiceLive.SentTypes.Contains("session.update"), "session configured");
+
+        _h.VoiceLive.Push(new VoiceLiveEvent.ResponseDone("failed", "Run failed"));
+
+        await Eventually.TrueAsync(() => session.Snapshot().Events.Any(e => e.Description.Contains("Run failed")), "failure on the timeline");
+        _caller.HangUp();
+        await run;
+    }
 }
